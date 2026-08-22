@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;" />
+<title>QU Bot</title>
+<link rel="stylesheet" href="settings.css" />
+</head>
+<body>
+  <header class="hero">
+    <div class="hero__preview"><div id="preview"></div></div>
+    <div class="hero__meta">
+      <h1>QU Bot</h1>
+      <p id="heroSub">A small desktop colleague.</p>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab is-active" data-tab="look" role="tab">Look</button>
+    <button class="tab" data-tab="feel" role="tab">Feelings</button>
+    <button class="tab" data-tab="behave" role="tab">Behaviour</button>
+    <button class="tab" data-tab="keys" role="tab">Controls</button>
+  </nav>
+
+  <main>
+    <!-- ---------------------------------------------------- LOOK -->
+    <section class="panel is-active" data-panel="look">
+      <h2>Body</h2>
+      <div class="grid" id="shapeGrid"></div>
+
+      <h2>Colour</h2>
+      <div class="swatches" id="coatGrid"></div>
+      <label class="row">
+        <span>Custom colour</span>
+        <input type="color" id="customCoat" />
+      </label>
+
+      <h2>Size</h2>
+      <label class="row row--slider">
+        <input type="range" id="size" min="64" max="260" step="4" />
+        <output id="sizeOut"></output>
+      </label>
+
+      <h2>Opacity</h2>
+      <label class="row row--slider">
+        <input type="range" id="opacity" min="25" max="100" step="5" />
+        <output id="opacityOut"></output>
+      </label>
+    </section>
+
+    <!-- ---------------------------------------------------- FEELINGS -->
+    <section class="panel" data-panel="feel">
+      <p class="note">Click any feeling to play it on the desktop.</p>
+      <div id="emotionGroups"></div>
+    </section>
+
+    <!-- ---------------------------------------------------- BEHAVIOUR -->
+    <section class="panel" data-panel="behave">
+      <div id="toggles"></div>
+      <h2>Actions</h2>
+      <div class="actions">
+        <button data-cmd="greet">Say hello</button>
+        <button data-cmd="hop">Hop</button>
+        <button data-cmd="celebrate">Celebrate</button>
+        <button data-cmd="sleep">Nap</button>
+        <button data-cmd="wake">Wake up</button>
+        <button data-cmd="reset">Reset pose</button>
+      </div>
+      <h2>Reset</h2>
+      <button class="danger" id="resetAll">Restore all defaults</button>
+    </section>
+
+    <!-- ---------------------------------------------------- CONTROLS -->
+    <section class="panel" data-panel="keys">
+      <h2>On the mascot</h2>
+      <dl class="keys">
+        <dt>Click</dt><dd>Poke it</dd>
+        <dt>Double-click</dt><dd>Get it talking</dd>
+        <dt>Drag</dt><dd>Pick it up — flick to throw</dd>
+        <dt>Hover &amp; wiggle</dt><dd>Tickle it</dd>
+        <dt>Hover &amp; stroke</dt><dd>Pet it</dd>
+        <dt>Right-click</dt><dd>Full menu</dd>
+        <dt>Scroll</dt><dd>Resize</dd>
+        <dt>Shift + scroll</dt><dd>Cycle body shape</dd>
+      </dl>
+      <h2>Anywhere</h2>
+      <dl class="keys">
+        <dt>Ctrl + Alt + B</dt><dd>Summon to cursor</dd>
+        <dt>Ctrl + Alt + H</dt><dd>Hide / show</dd>
+        <dt>Ctrl + Alt + C</dt><dd>Celebrate</dd>
+      </dl>
+      <p class="note">It also greets you by time of day, dozes off when you step away,
+        and welcomes you back when you return.</p>
+    </section>
+  </main>
+
+  <script type="module" src="settings.js"></script>
+</body>
+</html>

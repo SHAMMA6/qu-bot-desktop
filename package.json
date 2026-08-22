@@ -1,0 +1,54 @@
+{
+  "name": "qu-bot-desktop",
+  "productName": "QU Bot",
+  "version": "1.0.0",
+  "description": "A desktop mascot — a living little bot that roams your screen, reacts to you, and has a lot of feelings.",
+  "type": "module",
+  "main": "src/main/main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build": "electron-builder --win",
+    "pack": "electron-builder --win --dir",
+    "test": "node tools/validate.mjs && node tools/test-displays.mjs && node tools/test-attention.mjs",
+    "icons": "node tools/make-icons.cjs"
+  },
+  "author": "SHAMMA6",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^43.4.1",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.qubot.desktop",
+    "productName": "QU Bot",
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "assets/icon.ico",
+      "artifactName": "QU-Bot-${version}-Setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    },
+    "portable": {
+      "artifactName": "QU-Bot-${version}-portable.${ext}"
+    },
+    "directories": {
+      "output": "dist"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SHAMMA6/qu-bot-desktop.git"
+  }
+}

@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;" />
+<title>QU Bot</title>
+<link rel="stylesheet" href="mascot.css" />
+</head>
+<body>
+  <!-- Everything sits inside one transparent, click-through window. Hit testing in
+       mascot.js decides, per frame, whether the window should swallow clicks. -->
+  <div id="stage">
+    <div id="shadow"></div>
+
+    <div id="bot">
+      <div id="markHost"></div>
+    </div>
+
+    <!-- Effects sit in front of the body so sparkles, confetti and landing dust
+         read as happening around it rather than behind it. -->
+    <canvas id="fx"></canvas>
+
+    <div id="bubble" class="bubble">
+      <div class="bubble__body"><span id="bubbleText"></span></div>
+      <div class="bubble__tail"></div>
+    </div>
+
+    <div id="grabHint" class="hint"></div>
+  </div>
+
+  <script type="module" src="mascot.js"></script>
+</body>
+</html>
