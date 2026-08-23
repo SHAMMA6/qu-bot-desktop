@@ -1,7 +1,7 @@
 {
   "name": "qu-bot-desktop",
   "productName": "QU Bot",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "A desktop mascot — a living little bot that roams your screen, reacts to you, and has a lot of feelings.",
   "type": "module",
   "main": "src/main/main.cjs",
