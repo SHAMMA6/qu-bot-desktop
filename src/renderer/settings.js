@@ -371,9 +371,11 @@ function render(next) {
   document.querySelectorAll('[data-key]').forEach((i) => { i.checked = !!next[i.dataset.key]; });
 
   $('customCoat').value = next.customCoat;
-  $('size').value = next.size;
+  // Same reason as the sliders below: a value echoed back mid-drag drops the
+  // thumb wherever the last round trip finished, not where the finger is.
+  if (document.activeElement !== $('size')) $('size').value = next.size;
   $('sizeOut').textContent = `${next.size}px`;
-  $('opacity').value = Math.round(next.opacity * 100);
+  if (document.activeElement !== $('opacity')) $('opacity').value = Math.round(next.opacity * 100);
   $('opacityOut').textContent = `${Math.round(next.opacity * 100)}%`;
 
   // Do not fight the user mid-word: every keystroke round-trips through the
@@ -398,9 +400,18 @@ function render(next) {
     ? `Follows the calendar — today that is ${seasonalToday()}.`
     : '';
 
-  $('homeState').textContent = next.home
-    ? `Waiting at ${next.home.x}, ${next.home.y} while you work.`
-    : 'No spot set — it drifts around your cursor instead.';
+  // Say which of the two "where does it wait" rules is actually winning. A spot
+  // beats sitting on your window, and finding that out by wondering why the bot
+  // never sits on anything is a bad way to learn it.
+  const spotWins = next.home && next.homeWhenBusy;
+  $('homeState').textContent = !next.home
+    ? (next.rideWindows
+      ? 'No spot set — it sits on the window you are using instead.'
+      : 'No spot set — it drifts around your cursor instead.')
+    : spotWins
+      ? `Waiting at ${next.home.x}, ${next.home.y} while you work`
+        + (next.rideWindows ? ', in preference to sitting on your window.' : '.')
+      : `Spot set at ${next.home.x}, ${next.home.y}, used only in focus mode.`;
 }
 
 const PERCENT_SLIDERS = ['chatty', 'clingy', 'sassy', 'grabResponse', 'volume'];
@@ -451,4 +462,4 @@ api.get().then((s) => {
 });
 api.timers().then(renderTimers);
 api.bond().then(renderBond);
-api.update().then(renderUpdate);
+api.updateState().then(renderUpdate);

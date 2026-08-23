@@ -48,8 +48,10 @@ function run(a, { seconds, cursor, body, idle = 0, held = false, onEvent }) {
 let geometryViolations = 0;
 let offScreen = 0;
 function yieldChecks(a, pos) {
-  // The chosen target must never sit on top of the cursor...
-  if (a.stance !== STANCE.ROAM) {
+  // The chosen target must never sit on top of the cursor — except while riding,
+  // where the pointer has to be on the title bar to drag the window at all, and
+  // backing away from it is the one thing riding must not do.
+  if (a.stance !== STANCE.ROAM && a.stance !== STANCE.RIDE) {
     const d = Math.hypot(a.target.x - a.cursor.x, a.target.y - a.cursor.y);
     if (d < GAP - 1) geometryViolations++;
   }
@@ -314,6 +316,74 @@ function testDockingOnANarrowWindowStaysOnIt() {
   results.push('  a window too narrow to dock into still keeps it on the window');
 }
 
+// Riding used to be reachable only through the typing branch, which the
+// cursor-following switch skipped over entirely — so turning off "follow the
+// cursor" silently turned off "sit on the window you are using" as well.
+function testRidesWithCursorFollowingOff() {
+  const a = new Attention();
+  a.enabled = false;
+  const rect = { x: 300, y: 250, w: 1200, h: 700 };
+  a.noteApp({ process: 'explorer.exe', title: 'Downloads', rect });
+  geometryViolations = 0; offScreen = 0;
+  run(a, {
+    seconds: 8,
+    body: { x: 900, y: 500 },
+    cursor: (t) => ({ x: 200 + ((t * 900) % 3000), y: 500 }),
+    idle: 0,
+  });
+  check(a.stance === STANCE.RIDE,
+    `with following off and riding on, the stance was ${a.stance}, expected ride`);
+  check(Math.abs(a.target.y - (rect.y + 16)) < 12,
+    `rode at y=${a.target.y.toFixed(0)}, expected the title bar at y=${rect.y + 16}`);
+  check(offScreen === 0, `riding targeted off-screen in ${offScreen} frames`);
+  results.push('  rides the window in front even with cursor-following switched off');
+}
+
+// The thing riding is actually for: grabbing a window by its title bar and
+// dragging it. That is mouse movement, with the pointer parked exactly where the
+// mascot wants to sit — the two conditions that used to shake it straight off.
+function testHoldsOnWhileDraggingWithTheMouse() {
+  const a = new Attention();
+  const dt = 1 / 60;
+  let rect = { x: 300, y: 250, w: 1200, h: 700 };
+  // The grab point: on the bar, right where the body docks.
+  let cursor = { x: rect.x + rect.w - 138 - RADIUS - 8, y: rect.y + 16 };
+  const pos = { x: 900, y: 500 };
+
+  const step = () => {
+    a.noteApp({ process: 'chrome.exe', title: 'x', rect });
+    a.noteCursor(cursor);
+    a.noteIdle(0);
+    a.update(dt, {
+      body: pos, radius: RADIUS, display: displayFor(pos.x, pos.y), displays: DISPLAYS, held: false,
+    });
+    pos.x += (a.target.x - pos.x) * 0.25;
+    pos.y += (a.target.y - pos.y) * 0.25;
+  };
+
+  for (let i = 0; i < 60 * 5; i++) step();
+  check(a.stance === STANCE.RIDE, `before the drag the stance was ${a.stance}, expected ride`);
+  check(Math.abs(a.target.x - cursor.x) < 40,
+    `the cursor on the bar pushed the dock spot ${Math.abs(a.target.x - cursor.x).toFixed(0)}px away`);
+
+  // Drag the window 300px right over a second, cursor and window together.
+  let letGo = 0;
+  for (let i = 0; i < 60; i++) {
+    rect = { ...rect, x: 300 + i * 5 };
+    cursor = { x: rect.x + rect.w - 138 - RADIUS - 8, y: rect.y + 16 };
+    step();
+    if (a.stance !== STANCE.RIDE) letGo++;
+  }
+  check(letGo === 0, `it let go of the window in ${letGo} of the 60 frames of the drag`);
+  const docked = rect.x + rect.w - 138 - RADIUS - 8;
+  check(Math.abs(a.target.x - docked) < 20,
+    `after the drag it aimed at x=${a.target.x.toFixed(0)}, expected the moved bar at ${docked}`);
+  check(Math.abs(pos.x - a.target.x) < 60,
+    `the body trailed ${Math.abs(pos.x - a.target.x).toFixed(0)}px behind the window it was riding`);
+  check(a.tracking, 'a window still being dragged should be reported as being tracked');
+  results.push('  holds the title bar while you drag the window with the mouse');
+}
+
 // ---- the home spot --------------------------------------------------------
 function testWaitsOnItsSpotWhileTyping() {
   const a = new Attention();
@@ -378,6 +448,8 @@ testDocksIntoTheTitleBar();
 testRidingFollowsTheWindow();
 testDockingOnAMaximisedWindowStaysOnScreen();
 testDockingOnANarrowWindowStaysOnIt();
+testRidesWithCursorFollowingOff();
+testHoldsOnWhileDraggingWithTheMouse();
 testWaitsOnItsSpotWhileTyping();
 testFocusModeStaysHomeEvenWhileMousing();
 testHomeStillNeverSitsOnTheCursor();

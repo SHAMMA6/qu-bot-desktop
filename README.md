@@ -122,13 +122,18 @@ drifting around your cursor.
 performing entirely — no chatter, no wandering, no idle flourishes. The meters
 keep running underneath; it is just being polite.
 
-**It docks into your window.** While you type it settles into the title bar of
-the window you are working in, immediately left of the minimise / maximise /
-close buttons — so it reads as one more tab on that window — and it travels with
-the window when you drag it around. It never overlaps the buttons, which is
-checked by a test, because covering Close would be a genuinely unpleasant thing
-to get wrong. A window too narrow to dock into keeps it on the window rather than
-pushing it off the edge. Turn it off with *Sit on the window you are using*.
+**It docks into your window.** A second or two after you stop moving the mouse —
+or as soon as you start typing — it settles into the title bar of whatever window
+is in front, immediately left of the minimise / maximise / close buttons, so it
+reads as one more tab on that window. Any window: your browser, a file explorer,
+a terminal. Grab that window by its bar and drag it, and the bot comes with it;
+it deliberately does *not* back away from your pointer while riding, because your
+pointer is on the bar exactly when you are dragging. It never overlaps the
+buttons, which is checked by a test, because covering Close would be a genuinely
+unpleasant thing to get wrong. A window too narrow to dock into keeps it on the
+window rather than pushing it off the edge. This works whether or not *Follow the
+cursor* is on; if you have set a home spot, that wins, because it is the more
+specific instruction. Turn it off with *Sit on the window you are using*.
 
 **It counts the time you are actually working.** Not wall-clock time — the
 clock only advances while the OS reports recent input, so leaving the editor open

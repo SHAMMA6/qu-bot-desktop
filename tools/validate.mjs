@@ -56,6 +56,29 @@ for (const c of [...COATS, { key: 'custom', label: 'custom', coat: '#F19D38' }])
   check(ratio >= 3, `coat ${c.key}: eye contrast only ${ratio.toFixed(2)}:1`);
 }
 
+// --- the preload bridges expose exactly what the renderers call
+//
+// Both sides are plain object literals, so a duplicated key is legal JavaScript
+// that silently keeps only the last one. That is how every control in the
+// settings window came to be wired to the update checker instead.
+const BRIDGES = [
+  ['src/main/preload.cjs', 'src/renderer/mascot.js'],
+  ['src/main/preload-settings.cjs', 'src/renderer/settings.js'],
+];
+for (const [bridge, renderer] of BRIDGES) {
+  const exposed = new Set();
+  for (const m of readFileSync(bridge, 'utf8').matchAll(/^  (\w+):/gm)) {
+    check(!exposed.has(m[1]), `${bridge}: duplicate key "${m[1]}" — the later one silently wins`);
+    exposed.add(m[1]);
+  }
+  const called = new Set([...readFileSync(renderer, 'utf8')
+    .matchAll(/\bapi\.(\w+)/g)].map((m) => m[1]));
+  for (const c of called) {
+    check(exposed.has(c), `${renderer}: api.${c} is not exposed by ${bridge}`);
+  }
+  console.log(`bridge ${bridge}: ${exposed.size} exposed, ${called.size} called`);
+}
+
 // --- dialogue keys referenced by behaviour actually exist
 const dialogue = readFileSync('src/renderer/lib/dialogue.js', 'utf8');
 const defined = new Set([...dialogue.matchAll(/^  (\w+): \[/gm)].map((m) => m[1]));

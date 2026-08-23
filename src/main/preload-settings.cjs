@@ -11,8 +11,10 @@ contextBridge.exposeInMainWorld('qubotSettings', {
   bond: () => ipcRenderer.invoke('bond:get'),
   forgetBond: () => ipcRenderer.invoke('bond:forget'),
 
-  // Updates.
-  update: () => ipcRenderer.invoke('update:get'),
+  // Updates. Deliberately NOT called `update`: that name already belongs to the
+  // settings patch above, and in an object literal the later duplicate key wins
+  // silently — which took every control in the settings window down with it.
+  updateState: () => ipcRenderer.invoke('update:get'),
   checkUpdate: () => ipcRenderer.invoke('update:check'),
   installUpdate: () => ipcRenderer.invoke('update:install'),
   onUpdate: (cb) => ipcRenderer.on('update:state', (_e, v) => cb(v)),

@@ -18,6 +18,13 @@ const path = require('path');
 const { spawn } = require('child_process');
 const { app, screen } = require('electron');
 
+// What this app's own process is called: 'electron' when run from source, the
+// product name once packaged ('QU Bot').
+const SELF_NAMES = new Set([
+  'electron',
+  path.basename(process.execPath, '.exe').toLowerCase(),
+]);
+
 const SCRIPT = String.raw`
 param([int]$parent = 0)
 $ErrorActionPreference = 'Stop'
@@ -159,7 +166,10 @@ class Awareness {
     if (!raw || typeof raw.p !== 'string') return;
 
     // Ignore ourselves: the mascot reacting to its own settings window is noise.
-    if (/^electron$/i.test(raw.p) && /qu bot/i.test(raw.t || '')) return;
+    // Matching on the name of the running binary rather than on 'electron' —
+    // that only ever matched in development, so an installed build happily
+    // perched on its own settings window.
+    if (SELF_NAMES.has(String(raw.p).toLowerCase())) return;
 
     const [l, t, r, b] = raw.r || [0, 0, 0, 0];
     let rect = null;

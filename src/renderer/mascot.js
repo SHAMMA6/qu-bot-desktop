@@ -745,8 +745,10 @@ function frame(now) {
   // Hand the flight system its target. Only while actually flying under its own
   // power — a throw, a drag or a nap all take precedence.
   // A home spot is reason enough to move even with following and roaming both
-  // off — otherwise "park here while I work" would silently do nothing.
+  // off — otherwise "park here while I work" would silently do nothing. So is
+  // riding: "sit on the window I am using" is just as much a destination.
   const mayMove = S.settings.followCursor || S.settings.roam
+    || (S.settings.rideWindows && S.settings.watchActivity)
     || (S.settings.home && (S.settings.homeWhenBusy || S.settings.focusMode));
   if (mayMove && !S.dragging && !brain.asleep
       && physics.mode === MODE.FLOATING && !physics.gravityEnabled) {

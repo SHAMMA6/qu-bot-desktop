@@ -185,22 +185,44 @@ export class Attention {
     // stop competing for attention until they turn it off.
     if (this.focusMode && this.home) return this.setStance(STANCE.HOME, 0);
 
-    if (!this.enabled) {
-      return this.setStance(this.home && this.homeWhenBusy ? STANCE.HOME : STANCE.ROAM, 4);
-    }
-
     // Getting out of the way beats everything else.
     if (this.dodgeFor > 0) return;
+
+    // A home spot is the more specific instruction — "park exactly here while I
+    // work" — so it outranks riding, in every branch below.
+    const homeFirst = !!(this.home && this.homeWhenBusy);
+    const hasWindow = !!(this.watchApps && this.app && this.app.rect);
+    const canRide = this.rideWindows && hasWindow && !homeFirst;
+
+    // The window is being dragged or resized *right now*. Going along with that
+    // is the entire point of riding, so it outranks anything the cursor is
+    // doing: dragging a window IS mouse movement, and reading that as "the user
+    // is pointing at something" is what shook the mascot off the title bar at
+    // exactly the moment it was supposed to hold on.
+    if (canRide && (this.t - this.rectMovedAt) < 1.1) return this.setStance(STANCE.RIDE, 0);
+
+    // Following the cursor is switched off, so there is no pointer to hover
+    // near. The window in front is then the best thing to attend to — without
+    // this, turning off "follow the cursor" silently turned off riding too.
+    if (!this.enabled) {
+      if (canRide) return this.setStance(STANCE.RIDE, 3);
+      return this.setStance(homeFirst ? STANCE.HOME : STANCE.ROAM, 4);
+    }
 
     const away = this.idleSeconds > 45;
     if (away) return this.setStance(STANCE.ROAM, 6);
 
-    // While typing the cursor is meaningless. In order of preference: the spot
-    // the user chose, riding the window they are working in, beside it, or a
-    // screen edge when there is nothing to go on.
-    if (this.typing && this.typingFor > 1.2) {
-      if (this.home && this.homeWhenBusy) return this.setStance(STANCE.HOME, 3);
-      const hasWindow = this.watchApps && this.app && this.app.rect;
+    // Settled: either the keyboard is doing the work, or the pointer has simply
+    // been parked long enough to stop being what the user is attending to. In
+    // order of preference: the spot the user chose, riding the window they are
+    // working in, beside it, or a screen edge when there is nothing to go on.
+    //
+    // 1.8s is chosen to land before the shoulder fallback below can re-fire (it
+    // holds for 2s at a time). Any later and the two take turns, and the mascot
+    // spends its time flying between the cursor and the title bar.
+    const settled = (this.typing && this.typingFor > 1.2) || (canRide && this.stillFor > 1.8);
+    if (settled) {
+      if (homeFirst) return this.setStance(STANCE.HOME, 3);
       if (!hasWindow) return this.setStance(STANCE.EDGE, 3);
       return this.setStance(this.rideWindows ? STANCE.RIDE : STANCE.PERCH, 3);
     }
@@ -381,7 +403,11 @@ export class Attention {
       };
     };
 
-    const keepClear = this.enabled && this.cursor.has && this.stance !== STANCE.ROAM;
+    // Riding is exempt from keeping clear of the cursor. The pointer has to be
+    // on the title bar to drag the window, so a body that backs away from the
+    // cursor there is a body that lets go of every window the moment it moves.
+    const keepClear = this.enabled && this.cursor.has
+      && this.stance !== STANCE.ROAM && this.stance !== STANCE.RIDE;
     if (keepClear) {
       const ax = tx - this.cursor.x;
       const ay = ty - this.cursor.y;
