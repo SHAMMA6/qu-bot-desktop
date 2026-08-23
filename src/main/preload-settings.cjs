@@ -11,6 +11,12 @@ contextBridge.exposeInMainWorld('qubotSettings', {
   bond: () => ipcRenderer.invoke('bond:get'),
   forgetBond: () => ipcRenderer.invoke('bond:forget'),
 
+  // Updates.
+  update: () => ipcRenderer.invoke('update:get'),
+  checkUpdate: () => ipcRenderer.invoke('update:check'),
+  installUpdate: () => ipcRenderer.invoke('update:install'),
+  onUpdate: (cb) => ipcRenderer.on('update:state', (_e, v) => cb(v)),
+
   // Timers, alarms and the pomodoro cycle.
   timers: () => ipcRenderer.invoke('timers:get'),
   addTimer: (minutes, label) => ipcRenderer.invoke('timers:add', minutes, label),

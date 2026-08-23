@@ -110,6 +110,13 @@ const S = {
   machineFlags: { low: false, critical: false, offline: false, busy: false },
 };
 
+// 'auto' follows the calendar; 'none' is bare; anything else is worn all year.
+const resolveAccessory = (choice) => {
+  if (!choice || choice === 'none') return null;
+  if (choice === 'auto') return seasonalAccessory();
+  return choice;
+};
+
 const brain = new Brain(handleIntent);
 const attention = new Attention();
 const focus = new Focus();
@@ -593,7 +600,7 @@ function applySettings(next) {
 
   setVoice({ name: next.name, sassy: next.sassy });
   sound.set({ enabled: next.soundEnabled, volume: next.volume });
-  mark.setAccessory(next.seasonal ? seasonalAccessory() : null);
+  mark.setAccessory(resolveAccessory(next.accessory));
 
   if (!prev || !next.chatter) return;
   if (prev.shape !== next.shape && chance(0.6)) { setEmotion('curious'); speak(say('shapeChange')); }
@@ -951,6 +958,15 @@ const COMMANDS = {
     fx.burst('sparkle', S.fxOrigin, 8);
     speak(say('homeSet'));
     showHint('home set');
+  },
+  // Main picked the spot (cursor or a corner) — it owns screen geometry. All
+  // that is left here is to go there and say so.
+  homePlaced: (p) => {
+    physics.hoverTo(p.x, p.y);
+    setEmotion('proud');
+    fx.burst('sparkle', S.fxOrigin, 8);
+    speak(say('homeSet'));
+    showHint('spot set');
   },
   clearHome: () => {
     api.updateSettings({ home: null });

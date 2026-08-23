@@ -99,7 +99,6 @@ const TOGGLES = [
   ['homeWhenBusy', 'Wait on its spot while you work', 'Goes to the spot you picked instead of hovering near the cursor'],
   ['focusReports', 'Mention long stretches', 'Notices when you have been in one app for a long time'],
   ['machineAware', 'React to the machine', 'Notices low battery, the network dropping and heavy load'],
-  ['seasonal', 'Seasonal hats', 'A hat in December, shades in July'],
   ['autoUpdate', 'Automatic updates', 'Downloads new versions in the background'],
   ['roam', 'Wander around', 'Drifts around the screen on its own when you are idle'],
   ['gravity', 'Gravity', 'Off, it flies. On, it falls and sits on the ground like a desk pet'],
@@ -255,6 +254,76 @@ function buildTimers() {
   }, 1000);
 }
 
+// ---------------------------------------------------------------- accessory
+const ACCESSORIES = [
+  ['auto', 'Automatic'],
+  ['none', 'Nothing'],
+  ['santa', 'Santa hat'],
+  ['witch', 'Witch hat'],
+  ['party', 'Party hat'],
+  ['shades', 'Sunglasses'],
+];
+
+// What 'auto' resolves to today, so the Automatic button can say what you will
+// actually get rather than leaving you to guess.
+function seasonalToday(date = new Date()) {
+  const m = date.getMonth();
+  const d = date.getDate();
+  if (m === 0 && d <= 2) return 'a party hat';
+  if (m === 11 || (m === 0 && d <= 5)) return 'a santa hat';
+  if (m === 9 && d >= 24) return 'a witch hat';
+  if (m === 6 || m === 7) return 'sunglasses';
+  return 'nothing';
+}
+
+function buildAccessories() {
+  $('accessoryPicker').innerHTML = ACCESSORIES
+    .map(([key, label]) => `<button data-accessory="${key}">${label}</button>`).join('');
+  $('accessoryPicker').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-accessory]');
+    if (btn) api.update({ accessory: btn.dataset.accessory });
+  });
+}
+
+// ---------------------------------------------------------------- its spot
+const CORNERS = [
+  ['top-left', 'Top left'],
+  ['top-right', 'Top right'],
+  ['bottom-left', 'Bottom left'],
+  ['bottom-right', 'Bottom right'],
+];
+
+function buildCorners() {
+  $('cornerPicker').innerHTML = CORNERS
+    .map(([key, label]) => `<button data-corner="${key}">${label}</button>`).join('');
+  $('cornerPicker').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-corner]');
+    if (btn) api.command('__homeCorner', { corner: btn.dataset.corner });
+  });
+}
+
+// ---------------------------------------------------------------- updates
+function renderUpdate(u) {
+  if (!u) return;
+  const version = u.current ? `You are on ${u.current}. ` : '';
+  $('updateState').textContent = version + (u.label || '');
+  $('installUpdate').hidden = u.status !== 'ready';
+  // A check already in flight, or a build that cannot update, has nothing for
+  // the button to do.
+  $('checkUpdate').disabled = u.status === 'checking'
+    || u.status === 'downloading'
+    || u.status === 'unsupported';
+}
+
+function buildUpdates() {
+  $('checkUpdate').addEventListener('click', async () => {
+    renderUpdate({ status: 'checking', label: 'Checking for updates…' });
+    renderUpdate(await api.checkUpdate());
+  });
+  $('installUpdate').addEventListener('click', () => api.installUpdate());
+  api.onUpdate(renderUpdate);
+}
+
 // ---------------------------------------------------------------- bond
 function renderBond(b) {
   if (!b) return;
@@ -322,6 +391,13 @@ function render(next) {
     if (document.activeElement !== $(key)) $(key).value = next[key];
   }
 
+  const worn = next.accessory || 'auto';
+  document.querySelectorAll('[data-accessory]').forEach((b) =>
+    b.classList.toggle('is-on', b.dataset.accessory === worn));
+  $('accessoryNote').textContent = worn === 'auto'
+    ? `Follows the calendar — today that is ${seasonalToday()}.`
+    : '';
+
   $('homeState').textContent = next.home
     ? `Waiting at ${next.home.x}, ${next.home.y} while you work.`
     : 'No spot set — it drifts around your cursor instead.';
@@ -364,6 +440,9 @@ buildEmotions();
 buildActions();
 buildTimers();
 buildBond();
+buildUpdates();
+buildAccessories();
+buildCorners();
 
 api.onSettings(render);
 api.get().then((s) => {
@@ -372,3 +451,4 @@ api.get().then((s) => {
 });
 api.timers().then(renderTimers);
 api.bond().then(renderBond);
+api.update().then(renderUpdate);

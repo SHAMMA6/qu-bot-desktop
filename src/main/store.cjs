@@ -31,7 +31,9 @@ const DEFAULTS = {
   volume: 0.5,
   launchOnLogin: false,
   greetOnLaunch: true,
-  seasonal: true,        // a hat in December, shades in July
+  // What it wears: 'auto' follows the calendar, 'none' is bare, or name one
+  // outright and it keeps it all year.
+  accessory: 'auto',
   machineAware: true,    // react to battery, network and load
   focusReports: true,    // notice and mention long stretches in one app
   autoUpdate: true,
@@ -73,6 +75,9 @@ const BOND_DEFAULTS = {
   boredom: 0,
 };
 
+// Everything it can wear. 'auto' picks by date; 'none' is bare.
+const ACCESSORIES = ['auto', 'none', 'santa', 'witch', 'party', 'shades'];
+
 const num = (v, lo, hi, fallback) => {
   const n = Number(v);
   return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : fallback;
@@ -106,6 +111,9 @@ class Store {
           if (parsed.bond[k] !== undefined) this.bond[k] = parsed.bond[k];
         }
       }
+      // Migration: the old boolean became a choice. Someone who had switched
+      // seasonal hats off meant "none", not "back to automatic".
+      if (parsed.accessory === undefined && parsed.seasonal === false) this.data.accessory = 'none';
       if (Array.isArray(parsed.timers)) this.timers = parsed.timers;
       if (Array.isArray(parsed.shelf)) this.shelf = parsed.shelf;
     }
@@ -123,6 +131,7 @@ class Store {
     d.clingy = num(d.clingy, 0, 1, DEFAULTS.clingy);
     d.sassy = num(d.sassy, 0, 1, DEFAULTS.sassy);
     d.pomodoroWork = Math.round(num(d.pomodoroWork, 5, 120, DEFAULTS.pomodoroWork));
+    if (!ACCESSORIES.includes(d.accessory)) d.accessory = DEFAULTS.accessory;
     d.pomodoroBreak = Math.round(num(d.pomodoroBreak, 1, 60, DEFAULTS.pomodoroBreak));
 
     if (typeof d.customCoat !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(d.customCoat)) {
@@ -145,7 +154,7 @@ class Store {
 
     for (const k of ['gravity', 'roam', 'chatter', 'sleepWhenIdle', 'nudges',
       'gazeFollowsCursor', 'alwaysOnTop', 'soundEnabled', 'launchOnLogin', 'greetOnLaunch',
-      'followCursor', 'watchActivity', 'rideWindows', 'seasonal', 'machineAware',
+      'followCursor', 'watchActivity', 'rideWindows', 'machineAware',
       'focusReports', 'autoUpdate', 'homeWhenBusy', 'focusMode']) {
       d[k] = !!d[k];
     }
@@ -292,4 +301,4 @@ class Store {
   }
 }
 
-module.exports = { Store, DEFAULTS, BOND_DEFAULTS };
+module.exports = { Store, DEFAULTS, BOND_DEFAULTS, ACCESSORIES };

@@ -12,6 +12,7 @@ const { Store } = require('./store.cjs');
 const { loadCatalog, buildContextMenu, buildTrayMenu } = require('./menus.cjs');
 const { Awareness } = require('./awareness.cjs');
 const { Timers } = require('./timers.cjs');
+const { Updater } = require('./updater.cjs');
 
 const isDev = process.argv.includes('--dev');
 
@@ -35,8 +36,8 @@ let hidden = false;
 let awareness = null;
 let timers = null;
 let machineTimer = null;
-let updateTimer = null;
-let updateReady = null;   // version string once an update is downloaded
+let updater = null;
+let announcedUpdate = null;   // version we have already told the user about
 let lastCpuSample = null;
 let session = null;      // what startSession() told us about this launch
 
@@ -301,40 +302,38 @@ function shelfAction(action, file) {
 }
 
 // ---------------------------------------------------------------- updates
-// Only ever runs in a packaged build: in development there is no signed feed to
-// check against, and nothing useful to install. Loaded lazily and guarded, so a
-// missing or broken updater degrades to "no updates" rather than a crash.
-function checkForUpdates() {
-  if (!app.isPackaged || !store.get('autoUpdate')) return;
-  let autoUpdater;
-  try {
-    ({ autoUpdater } = require('electron-updater'));
-  } catch {
-    return;
-  }
-  autoUpdater.autoDownload = true;
-  autoUpdater.autoInstallOnAppQuit = true;
-  autoUpdater.on('update-downloaded', (info) => {
-    updateReady = (info && info.version) || 'a new version';
-    if (hidden) toggleVisible(true);
-    command('say', {
-      emotion: 'excited',
-      text: `version ${updateReady} is ready. restart me when you like.`,
-    });
+function startUpdater() {
+  updater = new Updater(store, (state) => {
+    // Tell the mascot only about the moment that matters. Checking, downloading
+    // and "already up to date" are menu detail, not things to interrupt with.
+    if (state.status === 'ready' && state.version !== announcedUpdate) {
+      announcedUpdate = state.version;
+      if (hidden) toggleVisible(true);
+      command('say', {
+        emotion: 'excited',
+        text: `version ${state.version} is ready. restart me when you like.`,
+      });
+    }
     refreshTray();
+    if (settingsWin && !settingsWin.isDestroyed()) {
+      settingsWin.webContents.send('update:state', state);
+    }
   });
-  autoUpdater.on('error', () => { /* offline, or no release yet */ });
-  const run = () => autoUpdater.checkForUpdates().catch(() => {});
-  setTimeout(run, 8000);
-  updateTimer = setInterval(run, 6 * 60 * 60 * 1000);
+  updater.start();
 }
 
-function installUpdate() {
-  try {
-    const { autoUpdater } = require('electron-updater');
-    app.isQuitting = true;
-    autoUpdater.quitAndInstall();
-  } catch { /* nothing to install */ }
+// A check the user asked for reports back either way, including "up to date".
+async function checkForUpdatesNow() {
+  if (!updater) return;
+  const state = await updater.check(true);
+  if (state.status === 'unsupported') {
+    command('say', { emotion: 'skeptical', text: state.reason });
+  } else if (state.status === 'none') {
+    command('say', { emotion: 'content', text: 'we are on the latest version.' });
+  } else if (state.status === 'error') {
+    command('say', { emotion: 'confused', text: 'could not reach the update server.' });
+  }
+  refreshTray();
 }
 
 // ---------------------------------------------------------------- tray
@@ -369,8 +368,9 @@ function refreshTray() {
     onCancelTimer: (id) => { timers?.cancel(id); refreshTray(); },
     onPomodoro: startOrStopPomodoro,
     onShelf: shelfAction,
-    updateReady,
-    onInstallUpdate: installUpdate,
+    update: updater ? { ...updater.state, label: updater.label } : null,
+    onInstallUpdate: () => updater?.install(),
+    onCheckUpdate: checkForUpdatesNow,
     onQuit: () => { app.isQuitting = true; app.quit(); },
   }));
 }
@@ -436,8 +436,53 @@ function updateSettings(patch) {
   return next;
 }
 
+// ---------------------------------------------------------------- its spot
+// Picking a spot by first dragging the mascot there and then opening a menu is
+// fiddly. These put it somewhere exact in one action instead: at the cursor, or
+// in a named corner of whichever screen you are looking at.
+
+const CORNERS = {
+  'top-left': [0, 0],
+  'top-right': [1, 0],
+  'bottom-left': [0, 1],
+  'bottom-right': [1, 1],
+};
+
+function setHomeAt(point) {
+  const host = displayAt(point);
+  const w = host.workArea;
+  const r = store.get('size') / 2;
+  // Keep the whole body on real screen space, so a spot picked at the very edge
+  // is still somewhere it can actually sit.
+  const home = {
+    x: Math.round(Math.min(Math.max(point.x, w.x + r), w.x + w.width - r)),
+    y: Math.round(Math.min(Math.max(point.y, w.y + r), w.y + w.height - r)),
+  };
+  updateSettings({ home, homeWhenBusy: true });
+  if (hidden) toggleVisible(true);
+  send('command', 'homePlaced', home);
+  return home;
+}
+
+const setHomeAtCursor = () => setHomeAt(screen.getCursorScreenPoint());
+
+function setHomeCorner(corner) {
+  const host = displayAt(screen.getCursorScreenPoint());
+  const w = host.workArea;
+  const inset = store.get('size') * 0.62;
+  const [fx, fy] = CORNERS[corner] || CORNERS['bottom-right'];
+  return setHomeAt({
+    x: fx ? w.x + w.width - inset : w.x + inset,
+    y: fy ? w.y + w.height - inset : w.y + inset,
+  });
+}
+
 function command(name, payload) {
   if (name === '__summon') return summon();
+  // Anything that needs screen geometry is answered here rather than forwarded
+  // to the renderer, which only knows about the display it is currently on.
+  if (name === '__homeCursor') return setHomeAtCursor();
+  if (name === '__homeCorner') return setHomeCorner(payload && payload.corner);
   if (hidden && name !== 'reset') toggleVisible(true);
   send('command', name, payload || {});
 }
@@ -520,8 +565,9 @@ ipcMain.on('bot:menu', (_e, ctx) => {
     onCancelTimer: (id) => { timers?.cancel(id); refreshTray(); },
     onPomodoro: startOrStopPomodoro,
     onShelf: shelfAction,
-    updateReady,
-    onInstallUpdate: installUpdate,
+    update: updater ? { ...updater.state, label: updater.label } : null,
+    onInstallUpdate: () => updater?.install(),
+    onCheckUpdate: checkForUpdatesNow,
     onHide: () => toggleVisible(false),
     onQuit: () => { app.isQuitting = true; app.quit(); },
   });
@@ -551,6 +597,15 @@ ipcMain.on('settings:reset', () => {
   if (settingsWin && !settingsWin.isDestroyed()) settingsWin.webContents.send('settings', next);
 });
 ipcMain.on('settings:command', (_e, name, payload) => command(name, payload));
+
+ipcMain.handle('update:get', () => (updater
+  ? { ...updater.state, label: updater.label, version: updater.state.version, current: app.getVersion() }
+  : { status: 'unsupported', reason: 'not ready yet', label: 'Updates unavailable', current: app.getVersion() }));
+ipcMain.handle('update:check', async () => {
+  await checkForUpdatesNow();
+  return updater ? { ...updater.state, label: updater.label, current: app.getVersion() } : null;
+});
+ipcMain.handle('update:install', () => !!updater?.install());
 
 ipcMain.handle('bond:get', () => store.bondSummary());
 ipcMain.handle('bond:forget', () => {
@@ -604,7 +659,7 @@ if (!app.requestSingleInstanceLock()) {
     startAwareness();
     startMachineFeed();
     startTimers();
-    checkForUpdates();
+    startUpdater();
 
     screen.on('display-added', onDisplaysChanged);
     screen.on('display-removed', onDisplaysChanged);
@@ -623,6 +678,9 @@ if (!app.requestSingleInstanceLock()) {
     globalShortcut.register('Control+Alt+F', () => updateSettings({ focusMode: !store.get('focusMode') }));
     // "How long have I been at this?"
     globalShortcut.register('Control+Alt+L', () => command('report'));
+    // Point at where you want it and press this. The most direct way there is
+    // to put it somewhere exact.
+    globalShortcut.register('Control+Alt+P', setHomeAtCursor);
 
     app.on('activate', () => { if (!overlay) createOverlay(); });
   });
@@ -638,7 +696,7 @@ if (!app.requestSingleInstanceLock()) {
     clearInterval(cursorTimer);
     clearInterval(idleTimer);
     clearInterval(machineTimer);
-    clearInterval(updateTimer);
+    updater?.stop();
     globalShortcut.unregisterAll();
     store?.flush();
   });

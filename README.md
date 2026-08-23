@@ -111,18 +111,24 @@ explicit button to make it forget you.
 
 ## Working alongside you
 
-**Give it a spot.** Right-click → *Its spot* → **Park it here**, and that is
-where it waits whenever you are typing, instead of drifting around your cursor.
+**Give it a spot.** Point at where you want it and press `Ctrl` + `Alt` + `P`.
+That is the whole interaction — no dragging it into place first. There are also
+four corner presets under **Settings → Focus** and in *Its spot → Park it in a
+corner*, and the old "park it where it is now" if you would rather position it by
+hand. Wherever you pick, that is where it waits while you type instead of
+drifting around your cursor.
 
 **Focus mode** (`Ctrl` + `Alt` + `F`) sends it to that spot and makes it stop
 performing entirely — no chatter, no wandering, no idle flourishes. The meters
 keep running underneath; it is just being polite.
 
-**It sits on your window.** While you type it perches on the title bar of the
-window you are working in and rides along when you drag it. On a maximised
-window there is no "above" to sit on, so it tucks inside the bar on the left,
-clear of the minimise/maximise/close cluster. Turn it off with *Sit on the window
-you are using*.
+**It docks into your window.** While you type it settles into the title bar of
+the window you are working in, immediately left of the minimise / maximise /
+close buttons — so it reads as one more tab on that window — and it travels with
+the window when you drag it around. It never overlaps the buttons, which is
+checked by a test, because covering Close would be a genuinely unpleasant thing
+to get wrong. A window too narrow to dock into keeps it on the window rather than
+pushing it off the edge. Turn it off with *Sit on the window you are using*.
 
 **It counts the time you are actually working.** Not wall-clock time — the
 clock only advances while the OS reports recent input, so leaving the editor open
@@ -163,8 +169,14 @@ See [How it feels in the hand](#how-it-feels-in-the-hand).
 Each emotion group has its own timbre, a landing thumps lower and dirtier the
 harder it lands, a throw whistles, and it breathes while it sleeps.
 
-**Seasonal hats** — a santa hat in December, shades in July, a witch hat at
-Halloween, a party hat on New Year. Off in one click.
+**Pick what it wears** under **Settings → Look → Wearing**, or from
+*right-click → Wearing*:
+
+| Choice | |
+| --- | --- |
+| Automatic | Follows the calendar — santa hat in December, sunglasses in July, witch hat at Halloween, party hat on New Year. The settings panel tells you what that means today |
+| Nothing | Bare |
+| Santa / Witch / Party / Sunglasses | Worn all year, whatever the date |
 
 **It notices the machine**: battery getting low, the charger going in, the
 network dropping, and sustained heavy CPU load.
@@ -195,6 +207,7 @@ Anywhere:
 | `Ctrl` + `Alt` + `C` | Celebrate |
 | `Ctrl` + `Alt` + `F` | Focus mode on / off |
 | `Ctrl` + `Alt` + `L` | How long have I been at this? |
+| `Ctrl` + `Alt` + `P` | Park it at my cursor |
 
 It also greets you by time of day, notices when you have been gone a while,
 marks the hour, occasionally suggests you take a break, and gets bored if
@@ -263,6 +276,7 @@ src/
     menus.cjs            Tray and right-click menus
     awareness.cjs        Foreground-window watcher (opt-out, local only)
     timers.cjs           Timers, alarms and the pomodoro cycle
+    updater.cjs          Whether this build can self-update, and doing it
     store.cjs            Debounced JSON settings + the bond record, in userData
     preload.cjs          The mascot window's IPC bridge
     preload-settings.cjs The settings window's IPC bridge
@@ -290,7 +304,8 @@ tools/
   validate.mjs           Character-data integrity checks
   test-displays.mjs      Multi-monitor + flight physics simulation
   test-attention.mjs     Attention rules: clearance, dodging, perching, riding
-  test-companion.mjs     Grab feel, the work clock, timers and pomodoro
+  test-companion.mjs     Grab feel, the work clock, timers, pomodoro, updates
+  release.mjs            Preflight checks, then triggers the Release workflow
 ```
 
 ### The window
@@ -408,6 +423,59 @@ Add `--shot-do-file=<path>` to drive it first — the script runs in the mascot
 window with `window.__qubot` in scope, e.g.
 `window.__qubot.pose({ x: 200, y: 210, emotion: 'love', text: 'hello.' })`.
 With `--dev`, display handoffs are logged as the window moves between monitors.
+
+## Releasing
+
+One command, or one button.
+
+```bash
+npm run release          # 1.2.0 -> 1.2.1
+npm run release minor    # 1.2.0 -> 1.3.0
+npm run release major    # 1.2.0 -> 2.0.0
+npm run release -- --dry # build and verify everything, but leave it as a draft
+```
+
+Or **Actions → Release → Run workflow** on GitHub, which is the same pipeline —
+the local command only pulls the trigger.
+
+Either way it runs the tests, bumps the version, tags it, builds on Windows,
+macOS and Linux, and publishes a release with the installers *and the update
+feed*. If the feed is missing it refuses to publish.
+
+### Why the update feed gets its own guard
+
+`latest.yml`, `latest-mac.yml` and `latest-linux.yml` carry the version,
+filenames and sha512 of every artifact. They are what an installed copy actually
+reads. Version 1.1.0 shipped without them — the upload step globbed
+`*.exe`, `*.dmg`, `*.AppImage` and missed the metadata entirely — so every
+installed copy checked, found nothing, and sat there. A dead updater and an
+up-to-date app look identical from the outside, which is exactly why this needs a
+test rather than a careful eye.
+
+Two things changed. Publishing is done by electron-builder itself
+(`--publish always`) so artifacts and their hashes are written as one
+consistent set, instead of being uploaded separately by a generic action that
+does not know they belong together. And the final job reads the release back and
+fails if any of the three feeds is absent. CI does a lighter version of the same
+check on every push.
+
+### What can actually update itself
+
+| Build | |
+| --- | --- |
+| Windows installer (NSIS) | Yes |
+| Linux AppImage | Yes, when run as the AppImage |
+| Windows portable `.exe` | No — there is no install to replace |
+| macOS | No unless signed; Squirrel.Mac refuses to swap an unsigned bundle |
+
+Builds that cannot update say so, in the tray and under **Settings → Behaviour →
+Updates**, rather than reporting "up to date" forever. Automatic checks run eight
+seconds after launch and every six hours; **Check now** works even with automatic
+updates switched off, and reports back either way.
+
+Signing the macOS build is the one thing that would move a row in that table from
+No to Yes. It needs a paid Apple Developer account, after which
+`CSC_LINK`/`CSC_KEY_PASSWORD` and `QUBOT_SIGNED=1` in the workflow are enough.
 
 ## Credits
 

@@ -44,6 +44,10 @@
         <input type="color" id="customCoat" />
       </label>
 
+      <h2>Wearing</h2>
+      <div class="actions" id="accessoryPicker"></div>
+      <p class="note" id="accessoryNote"></p>
+
       <h2>Size</h2>
       <label class="row row--slider">
         <input type="range" id="size" min="64" max="260" step="4" />
@@ -108,6 +112,13 @@
         <button data-cmd="wake">Wake up</button>
         <button data-cmd="reset">Reset pose</button>
       </div>
+      <h2>Updates</h2>
+      <p class="note" id="updateState">Checking…</p>
+      <div class="actions">
+        <button id="checkUpdate">Check now</button>
+        <button id="installUpdate" hidden>Restart and update</button>
+      </div>
+
       <h2>Reset</h2>
       <button class="danger" id="resetAll">Restore all defaults</button>
     </section>
@@ -116,8 +127,12 @@
     <section class="panel" data-panel="focus">
       <h2>Its spot</h2>
       <p class="note" id="homeState">No spot set.</p>
+      <p class="note">Point at where you want it and press
+        <strong>Ctrl + Alt + P</strong> — that is the quickest way. Or pick a corner:</p>
+      <div class="actions" id="cornerPicker"></div>
       <div class="actions">
-        <button data-cmd="setHome">Park it where it is</button>
+        <button data-cmd="__homeCursor">Park at my cursor</button>
+        <button data-cmd="setHome">Park where it is now</button>
         <button data-cmd="goHome">Send it there</button>
         <button data-cmd="clearHome">Forget the spot</button>
       </div>
@@ -188,6 +203,7 @@
         <dt>Ctrl + Alt + C</dt><dd>Celebrate</dd>
         <dt>Ctrl + Alt + F</dt><dd>Focus mode on / off</dd>
         <dt>Ctrl + Alt + L</dt><dd>How long have I been at this?</dd>
+        <dt>Ctrl + Alt + P</dt><dd>Park it at my cursor</dd>
       </dl>
       <h2>Other</h2>
       <dl class="keys">

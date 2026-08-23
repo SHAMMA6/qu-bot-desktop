@@ -80,6 +80,24 @@ function sizeMenu(settings, onSetting) {
   }));
 }
 
+const ACCESSORY_LABELS = [
+  ['auto', 'Automatic (by season)'],
+  ['none', 'Nothing'],
+  ['santa', 'Santa hat'],
+  ['witch', 'Witch hat'],
+  ['party', 'Party hat'],
+  ['shades', 'Sunglasses'],
+];
+
+function accessoryMenu(settings, onSetting) {
+  return ACCESSORY_LABELS.map(([key, label]) => ({
+    label,
+    type: 'radio',
+    checked: (settings.accessory || 'auto') === key,
+    click: () => onSetting({ accessory: key }),
+  }));
+}
+
 const QUICK_TIMERS = [5, 10, 15, 25, 45, 60];
 
 const mmss = (seconds) => {
@@ -146,7 +164,6 @@ const TOGGLES = [
   { key: 'homeWhenBusy', label: 'Wait on its spot while you work' },
   { key: 'focusReports', label: 'Mention long stretches' },
   { key: 'machineAware', label: 'React to battery and network' },
-  { key: 'seasonal', label: 'Seasonal hats' },
   { key: 'soundEnabled', label: 'Sound' },
   { key: 'alwaysOnTop', label: 'Always on top' },
   { key: 'greetOnLaunch', label: 'Greet on launch' },
@@ -176,11 +193,26 @@ function actionItems(settings, emotion, onCommand) {
 }
 
 // The parking spot, and the switch that sends it there and shuts it up.
+const CORNER_LABELS = [
+  ['top-left', 'Top left'],
+  ['top-right', 'Top right'],
+  ['bottom-left', 'Bottom left'],
+  ['bottom-right', 'Bottom right'],
+];
+
 function placeItems(settings, onCommand, onSetting) {
-  const items = [{
-    label: settings.home ? 'Move its spot here' : 'Park it here',
-    click: () => onCommand('setHome'),
-  }];
+  const items = [
+    // Point and press: the most direct way to put it somewhere exact.
+    { label: 'Park it at my cursor', accelerator: 'Ctrl+Alt+P', click: () => onCommand('__homeCursor') },
+    {
+      label: 'Park it in a corner',
+      submenu: CORNER_LABELS.map(([key, label]) => ({
+        label, click: () => onCommand('__homeCorner', { corner: key }),
+      })),
+    },
+    { label: settings.home ? 'Move its spot to where it is now' : 'Park it where it is now',
+      click: () => onCommand('setHome') },
+  ];
   if (settings.home) {
     items.push({ label: 'Send it to its spot', click: () => onCommand('goHome') });
     items.push({ label: 'Forget the spot', click: () => onCommand('clearHome') });
@@ -207,6 +239,7 @@ function commonSections(o) {
     { label: 'Shape', submenu: shapeMenu(settings, onSetting) },
     { label: 'Colour', submenu: coatMenu(settings, onSetting, onSettings) },
     { label: 'Size', submenu: sizeMenu(settings, onSetting) },
+    { label: 'Wearing', submenu: accessoryMenu(settings, onSetting) },
     { type: 'separator' },
     ...actionItems(settings, emotion, onCommand),
     { type: 'separator' },
@@ -232,17 +265,42 @@ const title = (settings, emotion) => {
   return `${name} — ${current ? current.label.toLowerCase() : emotion}`;
 };
 
-const updateItems = (updateReady, onInstallUpdate) => (updateReady
-  ? [{ type: 'separator' }, { label: `Restart to update to ${updateReady}`, click: onInstallUpdate }]
-  : []);
+// The update section reflects whatever the updater is actually doing, including
+// telling you plainly when this build cannot update itself at all.
+function updateItems(update, onInstallUpdate, onCheckUpdate) {
+  if (!update) return [];
+  const items = [{ type: 'separator' }];
+  switch (update.status) {
+    case 'ready':
+      items.push({ label: update.label, click: onInstallUpdate });
+      break;
+    case 'checking':
+    case 'downloading':
+    case 'unsupported':
+      items.push({ label: update.label, enabled: false });
+      break;
+    case 'available':
+      items.push({ label: update.label, enabled: false });
+      items.push({ label: 'Download it now', click: onCheckUpdate });
+      break;
+    case 'none':
+    case 'error':
+      items.push({ label: update.label, enabled: false });
+      items.push({ label: 'Check again', click: onCheckUpdate });
+      break;
+    default:
+      items.push({ label: 'Check for updates', click: onCheckUpdate });
+  }
+  return items;
+}
 
 function buildContextMenu(o) {
-  const { settings, emotion, updateReady, onInstallUpdate, onHide, onQuit } = o;
+  const { settings, emotion, update, onInstallUpdate, onCheckUpdate, onHide, onQuit } = o;
   return Menu.buildFromTemplate([
     { label: title(settings, emotion), enabled: false },
     { type: 'separator' },
     ...commonSections(o),
-    ...updateItems(updateReady, onInstallUpdate),
+    ...updateItems(update, onInstallUpdate, onCheckUpdate),
     { type: 'separator' },
     { label: 'Hide', accelerator: 'Ctrl+Alt+H', click: onHide },
     { label: `Quit ${settings.name || 'QU Bot'}`, click: onQuit },
@@ -250,7 +308,7 @@ function buildContextMenu(o) {
 }
 
 function buildTrayMenu(o) {
-  const { settings, hidden, emotion, updateReady, onInstallUpdate,
+  const { settings, hidden, emotion, update, onInstallUpdate, onCheckUpdate,
     onCommand, onToggleVisible, onQuit } = o;
   return Menu.buildFromTemplate([
     { label: title(settings, emotion), enabled: false },
@@ -259,7 +317,7 @@ function buildTrayMenu(o) {
     { label: 'Summon to cursor', accelerator: 'Ctrl+Alt+B', enabled: !hidden, click: () => onCommand('__summon') },
     { type: 'separator' },
     ...commonSections(o),
-    ...updateItems(updateReady, onInstallUpdate),
+    ...updateItems(update, onInstallUpdate, onCheckUpdate),
     { type: 'separator' },
     { label: `Quit ${settings.name || 'QU Bot'}`, click: onQuit },
   ]);

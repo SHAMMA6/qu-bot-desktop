@@ -319,3 +319,9 @@ input[type=text]:focus, input[type=number]:focus {
 }
 
 .link:hover { color: #e0484d !important; }
+
+/* A selected choice among plain action buttons (accessory, corners). */
+.actions button.is-on {
+  border-color: var(--accent) !important;
+  box-shadow: inset 0 0 0 1px var(--accent);
+}

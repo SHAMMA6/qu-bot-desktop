@@ -11,7 +11,8 @@
     "build": "electron-builder --win",
     "pack": "electron-builder --win --dir",
     "test": "node tools/validate.mjs && node tools/test-displays.mjs && node tools/test-attention.mjs && node tools/test-companion.mjs",
-    "icons": "node tools/make-icons.cjs"
+    "icons": "node tools/make-icons.cjs",
+    "release": "node tools/release.mjs"
   },
   "author": "SHAMMA6",
   "license": "MIT",

@@ -246,7 +246,7 @@ function testDisabledStillBehaves() {
 
 
 // ---- riding a window ------------------------------------------------------
-function testRidesTheTitleBar() {
+function testDocksIntoTheTitleBar() {
   const a = new Attention();
   const rect = { x: 300, y: 250, w: 1200, h: 700 };
   a.noteApp({ process: 'code.exe', title: 'x', rect });
@@ -256,16 +256,20 @@ function testRidesTheTitleBar() {
     cursor: () => ({ x: 600, y: 900 }),
     idle: 0,
   });
-  check(a.stance === STANCE.RIDE, `stance was ${a.stance}, expected to ride the window`);
-  // Sitting ON the top edge: above the window, not over its content.
-  check(a.target.y < rect.y + 10,
-    `rode at y=${a.target.y.toFixed(0)}, which is down inside the window, not on its bar`);
-  check(a.target.y > rect.y - RADIUS - 20,
-    `rode at y=${a.target.y.toFixed(0)}, floating well above the bar rather than on it`);
-  // ...and somewhere along that window's own width.
-  check(a.target.x > rect.x && a.target.x < rect.x + rect.w,
-    `rode at x=${a.target.x.toFixed(0)}, off the ends of the title bar`);
-  results.push('  sits on the title bar of the window you are working in');
+  check(a.stance === STANCE.RIDE, `stance was ${a.stance}, expected to dock into the window`);
+
+  // On the title bar line, not floating above it and not down over the content.
+  check(Math.abs(a.target.y - (rect.y + 16)) < 12,
+    `docked at y=${a.target.y.toFixed(0)}, expected the title bar at y=${rect.y + 16}`);
+
+  // Immediately left of the minimise / maximise / close cluster, and never
+  // overlapping it — covering Close would be a genuinely bad thing to ship.
+  const controlsLeft = rect.x + rect.w - 138;
+  check(a.target.x + RADIUS <= controlsLeft + 2,
+    `the body reached x=${(a.target.x + RADIUS).toFixed(0)}, over the window controls at ${controlsLeft}`);
+  check(a.target.x + RADIUS > controlsLeft - 40,
+    `docked at x=${a.target.x.toFixed(0)}, too far from the buttons to read as part of the bar`);
+  results.push('  docks into the title bar, just left of the window buttons');
 }
 
 function testRidingFollowsTheWindow() {
@@ -284,18 +288,30 @@ function testRidingFollowsTheWindow() {
   results.push('  rides along when you drag that window');
 }
 
-function testRidingAMaximisedWindowClearsTheControls() {
+function testDockingOnAMaximisedWindowStaysOnScreen() {
   const a = new Attention();
-  // Flush with the top of the screen: there is no "above" to sit on.
-  a.noteApp({ process: 'code.exe', title: 'x', rect: { x: 0, y: 0, w: 1920, h: 1032 } });
+  // Flush with the top of the screen: the bar is at the very edge.
+  const rect = { x: 0, y: 0, w: 1920, h: 1032 };
+  a.noteApp({ process: 'code.exe', title: 'x', rect });
   run(a, { seconds: 8, body: { x: 900, y: 500 }, cursor: () => ({ x: 900, y: 900 }), idle: 0 });
   check(a.stance === STANCE.RIDE, `stance was ${a.stance}, expected ride`);
   check(a.target.y >= RADIUS - 1,
-    `riding a maximised window put the body off the top of the screen at y=${a.target.y.toFixed(0)}`);
-  // The minimise / maximise / close cluster lives at the top RIGHT.
-  check(a.target.x < 1920 * 0.5,
-    `riding a maximised window sat at x=${a.target.x.toFixed(0)}, over the window controls`);
-  results.push('  tucks left on a maximised window, clear of the window controls');
+    `docking on a maximised window put the body off the top of the screen at y=${a.target.y.toFixed(0)}`);
+  const controlsLeft = rect.x + rect.w - 138;
+  check(a.target.x + RADIUS <= controlsLeft + 2,
+    `on a maximised window the body reached x=${(a.target.x + RADIUS).toFixed(0)}, over the controls`);
+  results.push('  stays on screen and clear of the buttons on a maximised window');
+}
+
+function testDockingOnANarrowWindowStaysOnIt() {
+  const a = new Attention();
+  // Narrower than the button cluster plus a body: there is nowhere ideal to go.
+  const rect = { x: 400, y: 300, w: 260, h: 400 };
+  a.noteApp({ process: 'code.exe', title: 'x', rect });
+  run(a, { seconds: 8, body: { x: 900, y: 500 }, cursor: () => ({ x: 900, y: 900 }), idle: 0 });
+  check(a.target.x >= rect.x - 1,
+    `a narrow window pushed the body off its left edge to x=${a.target.x.toFixed(0)}`);
+  results.push('  a window too narrow to dock into still keeps it on the window');
 }
 
 // ---- the home spot --------------------------------------------------------
@@ -358,9 +374,10 @@ testFollowsAcrossMonitors();
 testTypingBacksOff();
 testTypingWithoutWindowInfo();
 testPerchesOnAMaximisedWindow();
-testRidesTheTitleBar();
+testDocksIntoTheTitleBar();
 testRidingFollowsTheWindow();
-testRidingAMaximisedWindowClearsTheControls();
+testDockingOnAMaximisedWindowStaysOnScreen();
+testDockingOnANarrowWindowStaysOnIt();
 testWaitsOnItsSpotWhileTyping();
 testFocusModeStaysHomeEvenWhileMousing();
 testHomeStillNeverSitsOnTheCursor();

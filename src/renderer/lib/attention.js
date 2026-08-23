@@ -11,6 +11,11 @@
 
 import { clamp, approach, rand, chance, makeNoise, TAU } from './geom.js';
 
+// Windows title-bar geometry, in DIP. The minimise / maximise / close cluster is
+// three 46pt buttons; the bar itself is 32pt on both Windows 10 and 11.
+const CONTROLS_W = 138;
+const TITLE_BAR_H = 32;
+
 export const STANCE = {
   SHOULDER: 'shoulder',  // just off the cursor, watching what you point at
   PERCH: 'perch',        // parked at the corner of the window you are working in
@@ -257,31 +262,27 @@ export class Attention {
         break;
       }
 
-      // Sitting on the window itself, so dragging the window carries it along.
+      // Docked into the window's own title bar, sitting immediately left of the
+      // minimise / maximise / close cluster — so it reads as one more tab on
+      // that window, and travels with it when you drag the window around.
+      //
       // The title bar is the one strip of a window that is never content, which
       // is why it is the only place a mascot can sit without being in the way.
       case STANCE.RIDE: {
         const r = this.app && this.app.rect;
         if (!r) { this.stance = STANCE.EDGE; break; }
-        const host = nearestDisplay(displays, r.x + r.w / 2, r.y);
-        const perched = r.y - radius * 0.42;
-        // Two thirds along the bar, but never so close to an end that the body
-        // hangs off it. A window too narrow to allow any choice gets the middle.
-        const inset = radius + 16;
-        const alongBar = r.w > inset * 2
-          ? r.x + clamp(r.w * 0.66, inset, r.w - inset)
-          : r.x + r.w / 2;
 
-        if (perched - radius * 0.55 >= host.y) {
-          tx = alongBar;
-          ty = perched;
-        } else {
-          // Flush with the top of the screen — usually maximised, so there is no
-          // "above" to sit on. Tuck inside the bar on the LEFT, well clear of the
-          // minimise / maximise / close cluster on the right.
-          tx = r.x + radius * 0.95;
-          ty = r.y + radius * 0.72;
-        }
+        // The button cluster is about 138 DIP across on Windows 10 and 11
+        // (three 46pt buttons); the extra few pixels keep the body from ever
+        // touching Close, which would be an unpleasant thing to get wrong.
+        const docked = r.x + r.w - CONTROLS_W - radius - 8;
+        // A window too narrow for that gets the far left of its own bar rather
+        // than a spot outside itself.
+        tx = Math.max(r.x + radius * 0.6, docked);
+        // Centred on the bar: half the body rides above the window edge, which
+        // is what makes it read as attached to the window rather than floating
+        // over its content.
+        ty = r.y + TITLE_BAR_H * 0.5;
         break;
       }
 

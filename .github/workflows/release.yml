@@ -1,0 +1,180 @@
+name: Release
+
+# The whole release, start to finish, from one button.
+#
+#   Actions -> Release -> Run workflow -> pick patch / minor / major
+#
+# It bumps the version, tags it, builds on all three platforms, and publishes a
+# GitHub release complete with the update metadata that electron-updater needs.
+#
+# The metadata is the part that is easy to get wrong. `latest.yml`,
+# `latest-mac.yml` and `latest-linux.yml` carry the version, filenames and
+# sha512 of each artifact; without them in the release, installed copies have
+# nothing to check against and auto-update silently does nothing. That is why
+# electron-builder does the publishing here rather than a generic upload step —
+# it writes the artifacts and their hashes as one consistent set — and why the
+# final job refuses to publish a release that is missing them.
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Which part of the version to raise
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+        required: true
+      dry_run:
+        description: Build everything but leave the release as a draft
+        type: boolean
+        default: false
+
+concurrency:
+  # Two releases running at once would race on the version commit.
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.bump.outputs.version }}
+      tag: ${{ steps.bump.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Never cut a release from something that does not pass. This is the last
+      # point where stopping is cheap.
+      - name: Run checks
+        run: npm test
+
+      - name: Bump the version and tag it
+        id: bump
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          npm version "${{ inputs.bump }}" --no-git-tag-version
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION"    >> "$GITHUB_OUTPUT"
+          git add package.json package-lock.json
+          git commit -m "Release v$VERSION"
+          git tag -a "v$VERSION" -m "QU Bot $VERSION"
+          git push origin HEAD:${{ github.ref_name }}
+          git push origin "v$VERSION"
+
+      # Created up front so the three build jobs have one release to upload
+      # into, rather than racing each other to create it.
+      - name: Open a draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.bump.outputs.tag }}" \
+            --draft \
+            --title "QU Bot ${{ steps.bump.outputs.version }}" \
+            --generate-notes
+
+  build:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: windows
+            args: --win
+          - os: macos-latest
+            name: mac
+            args: --mac
+          - os: ubuntu-latest
+            name: linux
+            args: --linux
+
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # `--publish always` makes electron-builder upload the artifacts AND the
+      # latest*.yml update feed into the draft release as one consistent set.
+      - name: Build and publish
+        run: npx electron-builder ${{ matrix.args }} --publish always
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # No signing certificate in CI. Without this, electron-builder hunts
+          # for one on macOS and fails rather than producing an unsigned app.
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+  publish:
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      # The check that would have caught v1.1.0 shipping with a dead updater.
+      - name: Verify the update feed is present
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          ASSETS=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')
+          echo "$ASSETS"
+          MISSING=0
+          for f in latest.yml latest-mac.yml latest-linux.yml; do
+            if ! echo "$ASSETS" | grep -qx "$f"; then
+              echo "::error::$f is missing — installed copies could not see this update"
+              MISSING=1
+            fi
+          done
+          # An installer for each platform has to be there too.
+          for pattern in '\.exe$' '\.dmg$' '\.AppImage$'; do
+            if ! echo "$ASSETS" | grep -q "$pattern"; then
+              echo "::error::no asset matching $pattern"
+              MISSING=1
+            fi
+          done
+          exit $MISSING
+
+      - name: Publish the release
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+
+      - name: Summary
+        env:
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          {
+            echo "## QU Bot ${{ needs.prepare.outputs.version }}"
+            if [ "${{ inputs.dry_run }}" = "true" ]; then
+              echo "Built and verified, left as a **draft**."
+            else
+              echo "Published. Installed copies will offer the update within six hours."
+            fi
+            echo ""
+            echo "https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"
+          } >> "$GITHUB_STEP_SUMMARY"

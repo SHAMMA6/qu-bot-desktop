@@ -8,9 +8,11 @@
 import { Physics, MODE } from '../src/renderer/lib/physics.js';
 import { Focus } from '../src/renderer/lib/focus.js';
 import { createRequire } from 'node:module';
+import fs from 'node:fs';
 
 const require = createRequire(import.meta.url);
 const { Timers } = require('../src/main/timers.cjs');
+const { updateCapability } = require('../src/main/updater.cjs');
 
 let failures = 0;
 const results = [];
@@ -234,6 +236,67 @@ function testTimerSnapshotCountsDown() {
   results.push('  the timer list counts down, soonest first');
 }
 
+// ---------------------------------------------------------------- updates
+// Which builds can actually replace themselves. Getting this wrong is not a
+// cosmetic bug: a build that silently cannot update looks exactly like one that
+// is already up to date, so the user is never told to go and download it.
+function testUpdateCapability() {
+  const can = (o) => updateCapability(o).can;
+
+  check(!can({ packaged: false, platform: 'win32' }), 'a development build has no feed to check');
+  check(can({ packaged: true, platform: 'win32' }), 'the Windows installer should update itself');
+
+  check(!can({ packaged: true, platform: 'win32', env: { PORTABLE_EXECUTABLE_DIR: 'C:/x' } }),
+    'a portable exe has no install to replace, so it must not claim it can update');
+  check(!can({ packaged: true, platform: 'win32', target: 'portable' }),
+    'an explicit portable target must not claim it can update');
+
+  // Squirrel.Mac verifies the signature before swapping the bundle, so an
+  // unsigned build would download an update and then refuse to apply it.
+  check(!can({ packaged: true, platform: 'darwin' }), 'unsigned macOS cannot self-update');
+  check(can({ packaged: true, platform: 'darwin', env: { QUBOT_SIGNED: '1' } }),
+    'a signed macOS build should update itself');
+
+  check(can({ packaged: true, platform: 'linux', env: { APPIMAGE: '/tmp/QU.AppImage' } }),
+    'an AppImage should update itself');
+  check(!can({ packaged: true, platform: 'linux' }),
+    'a linux build that is not running as an AppImage cannot update itself');
+
+  // Every refusal has to carry a reason, because that reason is what the menu
+  // and the settings window show the user instead of a dead "check" button.
+  for (const o of [
+    { packaged: false, platform: 'win32' },
+    { packaged: true, platform: 'darwin' },
+    { packaged: true, platform: 'linux' },
+    { packaged: true, platform: 'freebsd' },
+    { packaged: true, platform: 'win32', env: { PORTABLE_EXECUTABLE_DIR: 'C:/x' } },
+  ]) {
+    const r = updateCapability(o);
+    check(!r.can && typeof r.reason === 'string' && r.reason.length > 8,
+      `refusing to update on ${o.platform} gave no usable reason`);
+  }
+  results.push('  only builds that can really self-update say so, and the rest explain why');
+}
+
+// The release workflow must ship the update feed. Without latest*.yml in the
+// release, every installed copy checks, finds nothing, and stays where it is —
+// which is exactly what shipped in 1.1.0.
+function testReleaseWorkflowShipsTheFeed() {
+  const yml = fs.readFileSync('.github/workflows/release.yml', 'utf8');
+  check(yml.includes('--publish always'),
+    'the release build must let electron-builder publish, so hashes and artifacts stay consistent');
+  for (const f of ['latest.yml', 'latest-mac.yml', 'latest-linux.yml']) {
+    check(yml.includes(f), `the release workflow never verifies ${f} reached the release`);
+  }
+  check(/--draft=false/.test(yml), 'the release is never taken out of draft');
+
+  const build = fs.readFileSync('.github/workflows/build.yml', 'utf8');
+  check(!build.includes('action-gh-release'),
+    'CI must not also attach release assets — two publishers is how metadata drifts from binaries');
+  check(build.includes('latest*.yml'), 'CI should prove the update feed is still being generated');
+  results.push('  the release workflow ships and verifies the update feed');
+}
+
 // ---------------------------------------------------------------- run
 console.log('companion');
 testGrabIsResponsive();
@@ -249,6 +312,8 @@ testTimersFireAndPersist();
 testStaleTimersAreDropped();
 testPomodoroAlternates();
 testTimerSnapshotCountsDown();
+testUpdateCapability();
+testReleaseWorkflowShipsTheFeed();
 
 for (const line of results) console.log(line);
 console.log(failures ? `\n${failures} FAILURES` : '\nall companion checks passed');
