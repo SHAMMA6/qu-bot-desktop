@@ -2,16 +2,30 @@
 // preview and the shape chips are the real character, not illustrations of it.
 
 import DATA from '../shared/mascot-data.js';
-import { Mark, SHAPE_KEYS } from './lib/mark.js';
-import { EMOTIONS, EMOTION_GROUPS } from './lib/emotions.js';
+import { Mark, SHAPE_KEYS, ACCESSORY_GROUPS } from './lib/mark.js';
+import { EMOTIONS, PREVIEW_REEL } from './lib/emotions.js';
 import { COATS, resolveCoat } from '../shared/themes.js';
 import { centroid, ringPath, clamp, TAU, approach, rand } from './lib/geom.js';
+import { t as translate, isRTL, LANGUAGES } from '../shared/i18n.js';
 
 const api = window.qubotSettings;
 const $ = (id) => document.getElementById(id);
 
+// Switching language rebuilds every list, because their labels are baked into
+// innerHTML. Their listeners must not be rebound each time, or one click fires
+// once per language the window has been in.
+const wired = new Set();
+const bindOnce = (id, fn) => { if (!wired.has(id)) { wired.add(id); fn(); } };
+
 let settings = null;
+let lang = 'en';
+const t = (key, vars) => translate(lang, key, vars);
+
+// The preview shows the bot feeling things on its own rather than offering a
+// grid of feelings to press. Nothing here reaches the mascot on the desktop —
+// what it feels out there is its own business now.
 let previewEmotion = 'idle';
+let previewLeft = 3;
 
 // ---------------------------------------------------------------- live preview
 const preview = new Mark($('preview'));
@@ -26,6 +40,16 @@ function previewLoop(now) {
   pLast = now;
   if (!settings) return;
   pClock += dt;
+
+  // Drift through the reel on its own, the way it does on the desktop.
+  previewLeft -= dt;
+  if (previewLeft <= 0) {
+    previewLeft = rand(3.5, 6.5);
+    let next = previewEmotion;
+    while (next === previewEmotion) next = PREVIEW_REEL[Math.floor(Math.random() * PREVIEW_REEL.length)];
+    previewEmotion = next;
+    $('heroSub').textContent = t(`emotion.${next}`);
+  }
 
   const def = EMOTIONS[previewEmotion] || EMOTIONS.idle;
   const bob = Math.sin(pClock * def.bob.rate * TAU) * def.bob.amp;
@@ -72,87 +96,52 @@ function buildShapes() {
   $('shapeGrid').innerHTML = SHAPE_KEYS.map((key) => `
     <button class="chip" data-shape="${key}">
       ${shapeThumb(key)}
-      <span>${DATA.shapes[key].label}</span>
+      <span>${t(`shape.${key}`)}</span>
     </button>`).join('');
 
-  $('shapeGrid').addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-shape]');
-    if (btn) api.update({ shape: btn.dataset.shape });
+  bindOnce('shapeGrid', () => {
+    $('shapeGrid').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-shape]');
+      if (btn) api.update({ shape: btn.dataset.shape });
+    });
   });
 }
 
 function buildCoats() {
   $('coatGrid').innerHTML = COATS.map((c) => `
-    <button class="swatch" data-coat="${c.key}" title="${c.label}"
+    <button class="swatch" data-coat="${c.key}" title="${t(`coat.${c.key}`)}"
             style="background:${c.coat}"></button>`).join('');
 
-  $('coatGrid').addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-coat]');
-    if (btn) api.update({ coat: btn.dataset.coat });
+  bindOnce('coatGrid', () => {
+    $('coatGrid').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-coat]');
+      if (btn) api.update({ coat: btn.dataset.coat });
+    });
   });
 }
 
 const TOGGLES = [
-  ['followCursor', 'Watch what you do', 'Floats near your cursor and the window you are working in'],
-  ['watchActivity', 'Notice the app in front', 'Reacts when you switch apps, and perches beside that window. Read locally only, never stored or sent anywhere'],
-  ['rideWindows', 'Sit on the window you are using', 'Perches on the title bar and rides along when you move the window'],
-  ['homeWhenBusy', 'Wait on its spot while you work', 'Goes to the spot you picked instead of hovering near the cursor'],
-  ['focusReports', 'Mention long stretches', 'Notices when you have been in one app for a long time'],
-  ['machineAware', 'React to the machine', 'Notices low battery, the network dropping and heavy load'],
-  ['autoUpdate', 'Automatic updates', 'Downloads new versions in the background'],
-  ['roam', 'Wander around', 'Drifts around the screen on its own when you are idle'],
-  ['gravity', 'Gravity', 'Off, it flies. On, it falls and sits on the ground like a desk pet'],
-  ['chatter', 'Speech bubbles', 'Occasional remarks and reactions'],
-  ['sleepWhenIdle', 'Sleep when idle', 'Dozes off when you step away'],
-  ['nudges', 'Occasional nudges', 'Hourly notes and the odd reminder to take a break'],
-  ['gazeFollowsCursor', 'Eyes follow cursor', 'Tracks your pointer around the screen'],
-  ['soundEnabled', 'Sound', 'Small procedural blips on interaction'],
-  ['alwaysOnTop', 'Always on top', 'Floats above other windows'],
-  ['greetOnLaunch', 'Greet on launch', 'Says hello when it starts up'],
-  ['launchOnLogin', 'Start with Windows', 'Launches quietly when you sign in'],
+  'followCursor', 'watchActivity', 'rideWindows', 'homeWhenBusy', 'focusReports',
+  'machineAware', 'autoUpdate', 'roam', 'gravity', 'chatter', 'sleepWhenIdle',
+  'nudges', 'gazeFollowsCursor', 'soundEnabled', 'alwaysOnTop', 'greetOnLaunch',
+  'launchOnLogin',
 ];
 
 function buildToggles() {
-  $('toggles').innerHTML = TOGGLES.map(([key, title, desc]) => `
+  $('toggles').innerHTML = TOGGLES.map((key) => `
     <label class="toggle">
-      <span class="toggle__text"><strong>${title}</strong><span>${desc}</span></span>
+      <span class="toggle__text"><strong>${t(`toggle.${key}`)}</strong><span>${t(`toggle.${key}.d`)}</span></span>
       <input type="checkbox" data-key="${key}" />
     </label>`).join('');
 
   // Bound on the document rather than on the container: some switches (focus
   // mode) live in their own panel, and render() already updates every
   // [data-key] on the page regardless of where it sits.
-  document.addEventListener('change', (e) => {
-    const input = e.target.closest('input[type=checkbox][data-key]');
-    if (input) api.update({ [input.dataset.key]: input.checked });
-  });
-}
-
-function buildEmotions() {
-  $('emotionGroups').innerHTML = EMOTION_GROUPS.map((g) => `
-    <div class="group">
-      <h3>${g.name}</h3>
-      <div class="emotions">
-        ${g.keys.map((k) => `
-          <button class="emotion" data-emotion="${k}">
-            <span>${EMOTIONS[k].emoji}</span>${EMOTIONS[k].label}
-          </button>`).join('')}
-      </div>
-    </div>`).join('');
-
-  $('emotionGroups').addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-emotion]');
-    if (!btn) return;
-    previewEmotion = btn.dataset.emotion;
-    api.command('emotion', { key: previewEmotion });
-    document.querySelectorAll('[data-emotion]').forEach((b) => b.classList.toggle('is-on', b === btn));
-    $('heroSub').textContent = EMOTIONS[previewEmotion].label;
-  });
-
-  // Hovering previews without disturbing the mascot on screen.
-  $('emotionGroups').addEventListener('pointerover', (e) => {
-    const btn = e.target.closest('[data-emotion]');
-    if (btn) previewEmotion = btn.dataset.emotion;
+  bindOnce('toggles', () => {
+    document.addEventListener('change', (e) => {
+      const input = e.target.closest('input[type=checkbox][data-key]');
+      if (input) api.update({ [input.dataset.key]: input.checked });
+    });
   });
 }
 
@@ -193,17 +182,17 @@ function renderTimers(next) {
   if (next) timerState = next;
   const list = $('timerList');
   if (!timerState.timers.length) {
-    list.innerHTML = '<li class="empty">Nothing running.</li>';
+    list.innerHTML = `<li class="empty">${t('focus.noTimers')}</li>`;
   } else {
-    list.innerHTML = timerState.timers.map((t) => `
+    list.innerHTML = timerState.timers.map((x) => `
       <li>
-        <span class="timers__label">${escapeText(t.label)}</span>
-        <span class="timers__left">${mmss(t.remaining)}</span>
-        <button class="link" data-cancel="${t.id}">cancel</button>
+        <span class="timers__label">${escapeText(x.label)}</span>
+        <span class="timers__left">${mmss(x.remaining)}</span>
+        <button class="link" data-cancel="${x.id}">${t('focus.cancel')}</button>
       </li>`).join('');
   }
   $('pomodoroToggle').textContent = timerState.pomodoro
-    ? `Stop (${timerState.pomodoro})` : 'Start';
+    ? `${t('focus.stop')} (${timerState.pomodoro})` : t('focus.start');
 }
 
 // Timer labels are user-entered, so they go in as text rather than as markup.
@@ -215,17 +204,17 @@ const escapeText = (s) => {
 
 function buildTimers() {
   $('quickTimers').innerHTML = QUICK.map((m) =>
-    `<button data-quick="${m}">${m} min</button>`).join('');
+    `<button data-quick="${m}">${t('menu.nMinutes', { n: m })}</button>`).join('');
 
   $('quickTimers').addEventListener('click', async (e) => {
     const btn = e.target.closest('[data-quick]');
-    if (btn) renderTimers(await api.addTimer(Number(btn.dataset.quick), `${btn.dataset.quick} minute timer`));
+    if (btn) renderTimers(await api.addTimer(Number(btn.dataset.quick), t('menu.nMinutes', { n: btn.dataset.quick })));
   });
 
   $('addTimer').addEventListener('click', async () => {
     const mins = Number($('timerMinutes').value);
     if (!mins || mins < 1) return;
-    const label = $('timerLabel').value.trim() || `${mins} minute timer`;
+    const label = $('timerLabel').value.trim() || t('menu.nMinutes', { n: mins });
     renderTimers(await api.addTimer(mins, label));
     $('timerMinutes').value = '';
     $('timerLabel').value = '';
@@ -255,58 +244,114 @@ function buildTimers() {
 }
 
 // ---------------------------------------------------------------- accessory
-const ACCESSORIES = [
-  ['auto', 'Automatic'],
-  ['none', 'Nothing'],
-  ['santa', 'Santa hat'],
-  ['witch', 'Witch hat'],
-  ['party', 'Party hat'],
-  ['shades', 'Sunglasses'],
-];
-
 // What 'auto' resolves to today, so the Automatic button can say what you will
-// actually get rather than leaving you to guess.
+// actually get rather than leaving you to guess. Returns a wearable key, or null.
 function seasonalToday(date = new Date()) {
   const m = date.getMonth();
   const d = date.getDate();
-  if (m === 0 && d <= 2) return 'a party hat';
-  if (m === 11 || (m === 0 && d <= 5)) return 'a santa hat';
-  if (m === 9 && d >= 24) return 'a witch hat';
-  if (m === 6 || m === 7) return 'sunglasses';
-  return 'nothing';
+  if (m === 0 && d <= 2) return 'party';
+  if (m === 11 || (m === 0 && d <= 5)) return 'santa';
+  if (m === 9 && d >= 24) return 'witch';
+  if (m === 6 || m === 7) return 'shades';
+  return null;
 }
 
 function buildAccessories() {
-  $('accessoryPicker').innerHTML = ACCESSORIES
-    .map(([key, label]) => `<button data-accessory="${key}">${label}</button>`).join('');
-  $('accessoryPicker').addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-accessory]');
-    if (btn) api.update({ accessory: btn.dataset.accessory });
+  const btn = (key, label) => `<button data-accessory="${key}">${label}</button>`;
+  $('accessoryPicker').innerHTML = `
+    <div class="actions">${btn('auto', t('wear.auto'))}${btn('none', t('wear.none'))}</div>
+    ${ACCESSORY_GROUPS.map((g) => `
+      <h3 class="subhead">${t(`wear.${g.key}`)}</h3>
+      <div class="actions">${g.keys.map((k) => btn(k, t(`acc.${k}`))).join('')}</div>`).join('')}`;
+  bindOnce('accessoryPicker', () => {
+    $('accessoryPicker').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-accessory]');
+      if (btn) api.update({ accessory: btn.dataset.accessory });
+    });
   });
 }
 
 // ---------------------------------------------------------------- its spot
-const CORNERS = [
-  ['top-left', 'Top left'],
-  ['top-right', 'Top right'],
-  ['bottom-left', 'Bottom left'],
-  ['bottom-right', 'Bottom right'],
-];
+const CORNERS = ['top-left', 'top-right', 'bottom-left', 'bottom-right'];
+
+function buildLanguages() {
+  $('languagePicker').innerHTML = LANGUAGES
+    .map((l) => `<button data-lang="${l.key}">${l.key === 'auto' ? t('wear.auto') : l.native}</button>`).join('');
+  bindOnce('languagePicker', () => {
+    $('languagePicker').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-lang]');
+      if (btn) api.update({ language: btn.dataset.lang });
+    });
+  });
+}
+
+// Everything with a key in the markup, plus the direction of the whole window.
+// Called once at boot and again whenever main tells us the language changed —
+// the built lists are rebuilt rather than patched, because their labels are
+// baked into innerHTML.
+function applyLanguage(next) {
+  lang = next || 'en';
+  const rtl = isRTL(lang);
+  document.documentElement.lang = lang;
+  document.documentElement.dir = rtl ? 'rtl' : 'ltr';
+
+  for (const el of document.querySelectorAll('[data-i18n]')) {
+    el.textContent = t(el.dataset.i18n, el.dataset.i18nKey ? { key: el.dataset.i18nKey } : undefined);
+  }
+  for (const el of document.querySelectorAll('[data-i18n-ph]')) {
+    el.placeholder = t(el.dataset.i18nPh);
+  }
+
+  buildShapes();
+  buildCoats();
+  buildToggles();
+  buildAccessories();
+  buildCorners();
+  buildLanguages();
+  buildQuickTimerLabels();
+  if (settings) render(settings);
+  renderTimers();
+  renderBond();
+  if (lastUpdate) renderUpdate(lastUpdate);
+}
+
+function buildQuickTimerLabels() {
+  $('quickTimers').innerHTML = QUICK.map((m) =>
+    `<button data-quick="${m}">${t('menu.nMinutes', { n: m })}</button>`).join('');
+}
 
 function buildCorners() {
   $('cornerPicker').innerHTML = CORNERS
-    .map(([key, label]) => `<button data-corner="${key}">${label}</button>`).join('');
-  $('cornerPicker').addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-corner]');
-    if (btn) api.command('__homeCorner', { corner: btn.dataset.corner });
+    .map((key) => `<button data-corner="${key}">${t(`corner.${key}`)}</button>`).join('');
+  bindOnce('cornerPicker', () => {
+    $('cornerPicker').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-corner]');
+      if (btn) api.command('__homeCorner', { corner: btn.dataset.corner });
+    });
   });
 }
 
 // ---------------------------------------------------------------- updates
+function updateLabel(u) {
+  switch (u.status) {
+    case 'unsupported': return t('update.unsupported', { reason: u.reason });
+    case 'checking': return t('update.checking');
+    case 'available': return t('update.available', { version: u.version });
+    case 'downloading': return t('update.downloading', { percent: u.percent });
+    case 'ready': return t('update.ready', { version: u.version });
+    case 'none': return t('update.none');
+    case 'error': return t('update.error', { reason: u.reason });
+    default: return t('update.check');
+  }
+}
+
+let lastUpdate = null;
+
 function renderUpdate(u) {
   if (!u) return;
-  const version = u.current ? `You are on ${u.current}. ` : '';
-  $('updateState').textContent = version + (u.label || '');
+  lastUpdate = u;
+  const version = u.current ? t('update.current', { version: u.current }) : '';
+  $('updateState').textContent = version + updateLabel(u);
   $('installUpdate').hidden = u.status !== 'ready';
   // A check already in flight, or a build that cannot update, has nothing for
   // the button to do.
@@ -317,7 +362,7 @@ function renderUpdate(u) {
 
 function buildUpdates() {
   $('checkUpdate').addEventListener('click', async () => {
-    renderUpdate({ status: 'checking', label: 'Checking for updates…' });
+    renderUpdate({ status: 'checking' });
     renderUpdate(await api.checkUpdate());
   });
   $('installUpdate').addEventListener('click', () => api.installUpdate());
@@ -325,26 +370,25 @@ function buildUpdates() {
 }
 
 // ---------------------------------------------------------------- bond
+let bondState = null;
+
 function renderBond(b) {
-  if (!b) return;
-  const hours = Math.floor(b.seconds / 3600);
-  const since = b.firstMet ? new Date(b.firstMet).toLocaleDateString() : '—';
+  if (b) bondState = b;
+  if (!bondState) return;
+  const n = bondState;
+  const hours = Math.floor(n.seconds / 3600);
+  const num = (v) => new Intl.NumberFormat(lang).format(v);
   const rows = [
-    ['Known each other', `${b.daysKnown} day${b.daysKnown === 1 ? '' : 's'}`],
-    ['First met', since],
-    ['Days seen', b.days],
-    ['Times opened', b.sessions],
-    ['Time together', hours >= 1 ? `${hours} hour${hours === 1 ? '' : 's'}` : '< 1 hour'],
-    ['Pokes', b.pokes],
-    ['Pets', b.pets],
-    ['Tickles', b.tickles],
-    ['Throws', b.throws],
-    ['Fondness', `${Math.round(b.affection * 100)}%`],
-    ['Mood', `${Math.round(b.mood * 100)}%`],
-    ['Bond level', `${b.level} of 4`],
+    [t('bond.days'), num(n.daysKnown)],
+    [t('bond.sessions'), num(n.sessions)],
+    [t('bond.time'), hours >= 1 ? num(hours) : '< 1'],
+    [t('bond.pokes'), num(n.pokes)],
+    [t('bond.pets'), num(n.pets)],
+    [t('bond.tickles'), num(n.tickles)],
+    [t('bond.throws'), num(n.throws)],
   ];
   $('bondStats').innerHTML = rows
-    .map(([k, v]) => `<dt>${k}</dt><dd>${escapeText(v)}</dd>`).join('');
+    .map(([k, v]) => `<dt>${escapeText(k)}</dt><dd>${escapeText(v)}</dd>`).join('');
 }
 
 function buildBond() {
@@ -396,22 +440,21 @@ function render(next) {
   const worn = next.accessory || 'auto';
   document.querySelectorAll('[data-accessory]').forEach((b) =>
     b.classList.toggle('is-on', b.dataset.accessory === worn));
-  $('accessoryNote').textContent = worn === 'auto'
-    ? `Follows the calendar — today that is ${seasonalToday()}.`
-    : '';
+  const today = seasonalToday();
+  $('accessoryNote').textContent = worn !== 'auto' ? ''
+    : today ? t('wear.autoNote', { what: t(`acc.${today}`) })
+      : t('wear.autoNothing');
 
   // Say which of the two "where does it wait" rules is actually winning. A spot
   // beats sitting on your window, and finding that out by wondering why the bot
   // never sits on anything is a bad way to learn it.
   const spotWins = next.home && next.homeWhenBusy;
+  const xy = next.home ? { x: next.home.x, y: next.home.y } : null;
   $('homeState').textContent = !next.home
-    ? (next.rideWindows
-      ? 'No spot set — it sits on the window you are using instead.'
-      : 'No spot set — it drifts around your cursor instead.')
+    ? t(next.rideWindows ? 'home.none' : 'home.noneDrift')
     : spotWins
-      ? `Waiting at ${next.home.x}, ${next.home.y} while you work`
-        + (next.rideWindows ? ', in preference to sitting on your window.' : '.')
-      : `Spot set at ${next.home.x}, ${next.home.y}, used only in focus mode.`;
+      ? t(next.rideWindows ? 'home.waitingOverRide' : 'home.waiting', xy)
+      : t('home.focusOnly', xy);
 }
 
 const PERCENT_SLIDERS = ['chatty', 'clingy', 'sassy', 'grabResponse', 'volume'];
@@ -447,7 +490,6 @@ buildTabs();
 buildShapes();
 buildCoats();
 buildToggles();
-buildEmotions();
 buildActions();
 buildTimers();
 buildBond();
@@ -456,7 +498,10 @@ buildAccessories();
 buildCorners();
 
 api.onSettings(render);
-api.get().then((s) => {
+api.onLanguage((l) => applyLanguage(l));
+
+Promise.all([api.get(), api.lang()]).then(([s, l]) => {
+  applyLanguage(l);
   render(s);
   requestAnimationFrame(previewLoop);
 });

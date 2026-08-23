@@ -12,205 +12,185 @@
     <div class="hero__preview"><div id="preview"></div></div>
     <div class="hero__meta">
       <h1 id="heroName">QU Bot</h1>
-      <p id="heroSub">A small desktop colleague.</p>
+      <p id="heroSub" data-i18n="app.tagline">A small desktop colleague.</p>
     </div>
   </header>
 
   <nav class="tabs" role="tablist">
-    <button class="tab is-active" data-tab="look" role="tab">Look</button>
-    <button class="tab" data-tab="feel" role="tab">Feelings</button>
-    <button class="tab" data-tab="behave" role="tab">Behaviour</button>
-    <button class="tab" data-tab="focus" role="tab">Focus</button>
-    <button class="tab" data-tab="bond" role="tab">Bond</button>
-    <button class="tab" data-tab="keys" role="tab">Controls</button>
+    <button class="tab is-active" data-tab="look" role="tab" data-i18n="tab.look">Look</button>
+    <button class="tab" data-tab="behave" role="tab" data-i18n="tab.behave">Behaviour</button>
+    <button class="tab" data-tab="focus" role="tab" data-i18n="tab.focus">Focus</button>
+    <button class="tab" data-tab="bond" role="tab" data-i18n="tab.bond">Bond</button>
+    <button class="tab" data-tab="keys" role="tab" data-i18n="tab.keys">Controls</button>
   </nav>
 
   <main>
     <!-- ---------------------------------------------------- LOOK -->
     <section class="panel is-active" data-panel="look">
-      <h2>Name</h2>
+      <h2 data-i18n="look.name">Name</h2>
       <label class="row">
-        <span>What to call it</span>
+        <span data-i18n="look.nameLabel">What to call it</span>
         <input type="text" id="botName" maxlength="24" spellcheck="false" />
       </label>
 
-      <h2>Body</h2>
+      <h2 data-i18n="look.body">Body</h2>
       <div class="grid" id="shapeGrid"></div>
 
-      <h2>Colour</h2>
+      <h2 data-i18n="look.colour">Colour</h2>
       <div class="swatches" id="coatGrid"></div>
       <label class="row">
-        <span>Custom colour</span>
+        <span data-i18n="look.customColour">Custom colour</span>
         <input type="color" id="customCoat" />
       </label>
 
-      <h2>Wearing</h2>
-      <div class="actions" id="accessoryPicker"></div>
+      <h2 data-i18n="look.wearing">Wearing</h2>
+      <div id="accessoryPicker"></div>
       <p class="note" id="accessoryNote"></p>
 
-      <h2>Size</h2>
+      <h2 data-i18n="look.size">Size</h2>
       <label class="row row--slider">
         <input type="range" id="size" min="64" max="260" step="4" />
         <output id="sizeOut"></output>
       </label>
 
-      <h2>Opacity</h2>
+      <h2 data-i18n="look.opacity">Opacity</h2>
       <label class="row row--slider">
         <input type="range" id="opacity" min="25" max="100" step="5" />
         <output id="opacityOut"></output>
       </label>
-    </section>
 
-    <!-- ---------------------------------------------------- FEELINGS -->
-    <section class="panel" data-panel="feel">
-      <p class="note">Click any feeling to play it on the desktop.</p>
-      <div id="emotionGroups"></div>
+      <h2 data-i18n="look.language">Language</h2>
+      <div class="actions" id="languagePicker"></div>
+      <p class="note" data-i18n="look.languageNote">Changes the menus, this window, and what it says.</p>
     </section>
 
     <!-- ---------------------------------------------------- BEHAVIOUR -->
     <section class="panel" data-panel="behave">
-      <h2>Personality</h2>
-      <p class="note">Two bots with different settings genuinely behave differently.</p>
+      <h2 data-i18n="behave.personality">Personality</h2>
+      <p class="note" data-i18n="behave.personalityNote">Two bots with different settings genuinely behave differently.</p>
       <label class="row row--slider">
-        <span class="slider__label">Quiet · Chatty</span>
+        <span class="slider__label" data-i18n="behave.chatty">Quiet · Chatty</span>
         <input type="range" id="chatty" min="0" max="100" step="5" />
         <output id="chattyOut"></output>
       </label>
       <label class="row row--slider">
-        <span class="slider__label">Independent · Clingy</span>
+        <span class="slider__label" data-i18n="behave.clingy">Independent · Clingy</span>
         <input type="range" id="clingy" min="0" max="100" step="5" />
         <output id="clingyOut"></output>
       </label>
       <label class="row row--slider">
-        <span class="slider__label">Sweet · Sassy</span>
+        <span class="slider__label" data-i18n="behave.sassy">Sweet · Sassy</span>
         <input type="range" id="sassy" min="0" max="100" step="5" />
         <output id="sassyOut"></output>
       </label>
 
-      <h2>Feel</h2>
+      <h2 data-i18n="behave.feel">Feel</h2>
       <label class="row row--slider">
-        <span class="slider__label">Grab weight</span>
+        <span class="slider__label" data-i18n="behave.grab">Grab weight</span>
         <input type="range" id="grabResponse" min="0" max="100" step="5" />
         <output id="grabResponseOut"></output>
       </label>
-      <p class="note">How tightly it follows your cursor when you pick it up.
-        Higher is snappier; lower feels heavier.</p>
+      <p class="note" data-i18n="behave.grabNote">How tightly it follows your cursor when you pick it up.</p>
       <label class="row row--slider">
-        <span class="slider__label">Volume</span>
+        <span class="slider__label" data-i18n="behave.volume">Volume</span>
         <input type="range" id="volume" min="0" max="100" step="5" />
         <output id="volumeOut"></output>
       </label>
 
-      <h2>Behaviour</h2>
+      <h2 data-i18n="behave.heading">Behaviour</h2>
       <div id="toggles"></div>
-      <h2>Actions</h2>
-      <div class="actions">
-        <button data-cmd="greet">Say hello</button>
-        <button data-cmd="hop">Hop</button>
-        <button data-cmd="celebrate">Celebrate</button>
-        <button data-cmd="sleep">Nap</button>
-        <button data-cmd="wake">Wake up</button>
-        <button data-cmd="reset">Reset pose</button>
-      </div>
-      <h2>Updates</h2>
+      <h2 data-i18n="behave.updates">Updates</h2>
       <p class="note" id="updateState">Checking…</p>
       <div class="actions">
-        <button id="checkUpdate">Check now</button>
-        <button id="installUpdate" hidden>Restart and update</button>
+        <button id="checkUpdate" data-i18n="behave.checkNow">Check now</button>
+        <button id="installUpdate" hidden data-i18n="behave.restartUpdate">Restart and update</button>
       </div>
 
-      <h2>Reset</h2>
-      <button class="danger" id="resetAll">Restore all defaults</button>
+      <h2 data-i18n="behave.reset">Reset</h2>
+      <button class="danger" id="resetAll" data-i18n="behave.resetAll">Restore all defaults</button>
     </section>
 
     <!-- ---------------------------------------------------- FOCUS -->
     <section class="panel" data-panel="focus">
-      <h2>Its spot</h2>
+      <h2 data-i18n="focus.spot">Its spot</h2>
       <p class="note" id="homeState">No spot set.</p>
-      <p class="note">Point at where you want it and press
-        <strong>Ctrl + Alt + P</strong> — that is the quickest way. Or pick a corner:</p>
+      <p class="note" data-i18n="focus.spotHint" data-i18n-key="Ctrl + Alt + P"></p>
       <div class="actions" id="cornerPicker"></div>
       <div class="actions">
-        <button data-cmd="__homeCursor">Park at my cursor</button>
-        <button data-cmd="setHome">Park where it is now</button>
-        <button data-cmd="goHome">Send it there</button>
-        <button data-cmd="clearHome">Forget the spot</button>
+        <button data-cmd="__homeCursor" data-i18n="focus.parkCursor">Park at my cursor</button>
+        <button data-cmd="setHome" data-i18n="focus.parkHere">Park where it is now</button>
+        <button data-cmd="goHome" data-i18n="focus.sendThere">Send it there</button>
+        <button data-cmd="clearHome" data-i18n="focus.forget">Forget the spot</button>
       </div>
-      <p class="note">While you are typing it waits on this spot instead of
-        drifting around your cursor.</p>
+      <p class="note" data-i18n="focus.spotNote">While you are typing it waits on this spot.</p>
 
-      <h2>Focus mode</h2>
+      <h2 data-i18n="focus.mode">Focus mode</h2>
       <label class="toggle">
         <span class="toggle__text">
-          <strong>Focus mode</strong>
-          <span>Goes to its spot, stops talking and stops performing. Ctrl + Alt + F</span>
+          <strong data-i18n="focus.mode">Focus mode</strong>
+          <span data-i18n="focus.modeDesc" data-i18n-key="Ctrl + Alt + F"></span>
         </span>
         <input type="checkbox" data-key="focusMode" />
       </label>
 
-      <h2>Timers</h2>
+      <h2 data-i18n="focus.timers">Timers</h2>
       <div class="actions" id="quickTimers"></div>
       <div class="row row--inline">
-        <input type="number" id="timerMinutes" min="1" max="1440" step="1" placeholder="minutes" />
-        <input type="text" id="timerLabel" maxlength="40" placeholder="what for (optional)" />
-        <button id="addTimer">Set</button>
+        <input type="number" id="timerMinutes" min="1" max="1440" step="1" data-i18n-ph="focus.minutes" placeholder="minutes" />
+        <input type="text" id="timerLabel" maxlength="40" data-i18n-ph="focus.timerLabel" placeholder="what for (optional)" />
+        <button id="addTimer" data-i18n="focus.set">Set</button>
       </div>
       <ul class="timers" id="timerList"></ul>
 
-      <h2>Pomodoro</h2>
+      <h2 data-i18n="focus.pomodoro">Pomodoro</h2>
       <div class="row row--inline">
-        <label class="mini">Work
+        <label class="mini"><span data-i18n="focus.work">Work</span>
           <input type="number" id="pomodoroWork" min="5" max="120" step="1" />
         </label>
-        <label class="mini">Break
+        <label class="mini"><span data-i18n="focus.break">Break</span>
           <input type="number" id="pomodoroBreak" min="1" max="60" step="1" />
         </label>
         <button id="pomodoroToggle">Start</button>
       </div>
-      <p class="note">It goes heads-down during a work block and celebrates when
-        the break starts.</p>
+      <p class="note" data-i18n="focus.pomodoroNote">It goes heads-down during a work block.</p>
     </section>
 
     <!-- ---------------------------------------------------- BOND -->
     <section class="panel" data-panel="bond">
-      <h2>What it remembers</h2>
+      <h2 data-i18n="bond.title">What it remembers</h2>
       <dl class="keys" id="bondStats"></dl>
-      <p class="note">These carry across restarts. Its mood and how fond it is of
-        you are built from them, and some things it says only unlock after you
-        have known each other a while.</p>
-      <h2>Start over</h2>
-      <button class="danger" id="forgetBond">Forget everything about me</button>
-      <p class="note">Restoring defaults elsewhere deliberately leaves this alone.</p>
+      <p class="note" data-i18n="bond.note">These carry across restarts.</p>
+      <h2 data-i18n="bond.startOver">Start over</h2>
+      <button class="danger" id="forgetBond" data-i18n="bond.forget">Forget everything about me</button>
+      <p class="note" data-i18n="bond.forgetNote">Restoring defaults elsewhere leaves this alone.</p>
     </section>
 
     <!-- ---------------------------------------------------- CONTROLS -->
     <section class="panel" data-panel="keys">
-      <h2>On the mascot</h2>
+      <h2 data-i18n="keys.onMascot">On the mascot</h2>
       <dl class="keys">
-        <dt>Click</dt><dd>Poke it</dd>
-        <dt>Double-click</dt><dd>Get it talking</dd>
-        <dt>Drag</dt><dd>Pick it up — flick to throw</dd>
-        <dt>Hover &amp; wiggle</dt><dd>Tickle it</dd>
-        <dt>Hover &amp; stroke</dt><dd>Pet it</dd>
-        <dt>Right-click</dt><dd>Full menu</dd>
-        <dt>Scroll</dt><dd>Resize</dd>
-        <dt>Shift + scroll</dt><dd>Cycle body shape</dd>
+        <dt data-i18n="keys.click">Click</dt><dd data-i18n="keys.clickDo">Poke it</dd>
+        <dt data-i18n="keys.dblclick">Double-click</dt><dd data-i18n="keys.dblclickDo">Get it talking</dd>
+        <dt data-i18n="keys.drag">Drag</dt><dd data-i18n="keys.dragDo">Pick it up</dd>
+        <dt data-i18n="keys.wiggle">Hover &amp; wiggle</dt><dd data-i18n="keys.wiggleDo">Tickle it</dd>
+        <dt data-i18n="keys.stroke">Hover &amp; stroke</dt><dd data-i18n="keys.strokeDo">Pet it</dd>
+        <dt data-i18n="keys.rightclick">Right-click</dt><dd data-i18n="keys.rightclickDo">Full menu</dd>
+        <dt data-i18n="keys.scroll">Scroll</dt><dd data-i18n="keys.scrollDo">Resize</dd>
+        <dt data-i18n="keys.shiftScroll">Shift + scroll</dt><dd data-i18n="keys.shiftScrollDo">Cycle body shape</dd>
       </dl>
-      <h2>Anywhere</h2>
+      <h2 data-i18n="keys.anywhere">Anywhere</h2>
       <dl class="keys">
-        <dt>Ctrl + Alt + B</dt><dd>Summon to cursor</dd>
-        <dt>Ctrl + Alt + H</dt><dd>Hide / show</dd>
-        <dt>Ctrl + Alt + C</dt><dd>Celebrate</dd>
-        <dt>Ctrl + Alt + F</dt><dd>Focus mode on / off</dd>
-        <dt>Ctrl + Alt + L</dt><dd>How long have I been at this?</dd>
-        <dt>Ctrl + Alt + P</dt><dd>Park it at my cursor</dd>
+        <dt>Ctrl + Alt + B</dt><dd data-i18n="keys.summon">Summon to cursor</dd>
+        <dt>Ctrl + Alt + H</dt><dd data-i18n="keys.hideShow">Hide / show</dd>
+        <dt>Ctrl + Alt + F</dt><dd data-i18n="keys.focusToggle">Focus mode on / off</dd>
+        <dt>Ctrl + Alt + L</dt><dd data-i18n="keys.report">How long have I been at this?</dd>
+        <dt>Ctrl + Alt + P</dt><dd data-i18n="keys.park">Park it at my cursor</dd>
       </dl>
-      <h2>Other</h2>
+      <h2 data-i18n="keys.other">Other</h2>
       <dl class="keys">
-        <dt>Drop a file on it</dt><dd>It holds onto it until you take it back</dd>
+        <dt data-i18n="keys.drop">Drop a file on it</dt><dd data-i18n="keys.dropDo">It holds onto it</dd>
       </dl>
-      <p class="note">It also greets you by time of day, dozes off when you step away,
-        and welcomes you back when you return.</p>
+      <p class="note" data-i18n="keys.note">It also greets you by time of day.</p>
     </section>
   </main>
 

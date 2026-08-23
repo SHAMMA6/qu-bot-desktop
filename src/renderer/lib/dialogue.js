@@ -2,7 +2,11 @@
 // it comments on things rather than begging for attention.
 
 import { pick } from './geom.js';
+import { AR, AR_SASSY } from './dialogue-ar.js';
 
+// English is the canonical table: every other pack is checked against its keys
+// and its {placeholders} by `npm test`, so a translation can never quietly
+// render a sentence with a hole in it.
 export const LINES = {
   greetMorning: [
     'morning. i kept the desktop warm.',
@@ -147,6 +151,14 @@ export const LINES = {
     'i will hover quietly.',
     'you are on a roll.',
     'typing. i will get out of the way.',
+  ],
+  typingLong: [
+    'still going. respect.',
+    'this is a whole paragraph now.',
+    'your hands are faster than mine.',
+    'i will keep quiet over here.',
+    'work appears to be happening.',
+    'you are on a run.',
   ],
   stoppedTyping: [
     'done?',
@@ -436,6 +448,21 @@ export const SASSY = {
   ],
 };
 
+// The packs it can speak in. English is the fallback for everything, so a pack
+// that is missing a bucket falls back to a real line rather than to silence.
+export const PACKS = {
+  en: { lines: LINES, sassy: SASSY },
+  ar: { lines: AR, sassy: AR_SASSY },
+};
+
+export const LANGUAGES = Object.keys(PACKS);
+
+let pack = PACKS.en;
+
+export function setLanguage(lang) {
+  pack = PACKS[lang] || PACKS.en;
+}
+
 const fill = (line, vars) => {
   let out = String(line).split('{name}').join(VOICE.name);
   if (vars) {
@@ -445,16 +472,16 @@ const fill = (line, vars) => {
 };
 
 export const say = (key, vars) => {
-  const spicy = SASSY[key];
+  const spicy = pack.sassy[key];
   const pool = (spicy && Math.random() < VOICE.sassy * 0.75)
     ? spicy
-    : (LINES[key] || LINES.idleMusing);
+    : (pack.lines[key] || LINES[key] || LINES.idleMusing);
   return fill(pick(pool), vars);
 };
 
 // The bond line for a level, if that level has anything new to say.
 export const bondLine = (level, vars) => {
-  const pool = LINES['bond' + level];
+  const pool = pack.lines['bond' + level] || LINES['bond' + level];
   return pool ? fill(pick(pool), vars) : null;
 };
 

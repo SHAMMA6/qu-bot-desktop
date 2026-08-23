@@ -325,3 +325,29 @@ input[type=text]:focus, input[type=number]:focus {
   border-color: var(--accent) !important;
   box-shadow: inset 0 0 0 1px var(--accent);
 }
+
+/* ---------------------------------------------------------- wearing groups */
+/* Thirty-five wearables need headings; one flat row of them is unreadable. */
+.subhead {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 12px 0 5px;
+}
+#accessoryPicker .actions { margin-bottom: 4px; }
+
+/* ---------------------------------------------------------- right to left */
+/* Arabic. Almost everything is flex or grid and mirrors on its own; these are
+   the places that hard-code a side. `dir` is set on <html> by settings.js. */
+[dir='rtl'] body { font-family: 'Segoe UI Variable Text', 'Segoe UI', Tahoma, system-ui, sans-serif; }
+[dir='rtl'] .toggle__text { text-align: right; }
+[dir='rtl'] .keys dt { text-align: right; }
+[dir='rtl'] .timers__label { text-align: right; }
+/* Sliders read low-to-high in the reading direction. */
+[dir='rtl'] input[type='range'] { direction: rtl; }
+/* Latin runs (version numbers, shortcut names, hex colours) keep their own
+   direction inside an RTL paragraph rather than being reordered around it. */
+[dir='rtl'] #updateState,
+[dir='rtl'] .keys dd { unicode-bidi: plaintext; }

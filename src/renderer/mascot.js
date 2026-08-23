@@ -15,7 +15,7 @@ import { Brain } from './lib/behavior.js';
 import { Attention, STANCE } from './lib/attention.js';
 import { Focus } from './lib/focus.js';
 import { Sound } from './lib/sound.js';
-import { say, LINES, setVoice } from './lib/dialogue.js';
+import { say, LINES, setVoice, setLanguage } from './lib/dialogue.js';
 import { resolveCoat } from '../shared/themes.js';
 import { clamp, rand, pick, chance, approach, ease, lerpExpression, makeNoise, TAU } from './lib/geom.js';
 
@@ -92,6 +92,8 @@ const S = {
 
   walkLeft: 0,
   idleSeconds: 0,
+  typingBeat: 0,        // seconds until the next beat of the typing act
+  typingFor: 0,         // how long this typing stretch has run
   activity: null,        // { kind, label } of the app in front
   reactCooldown: 0,      // throttles reactions to what you are doing
   hostId: null,          // display the body is currently on
@@ -259,6 +261,59 @@ function appLine(kind, label) {
   const lines = LINES[`app_${kind}`];
   const line = lines ? pick(lines) : null;
   return line || say('appOther').replace('{app}', label);
+}
+
+// While you are typing, the bot has something to do — a rolling performance for
+// as long as your hands are on the keys, rather than one reaction at the start
+// of a burst and then twenty seconds of nothing. Typing is most of what anyone
+// does at a desk, so it is the state worth filling.
+//
+// Weighted rather than sequenced: the same keys give a different show each time,
+// and the quiet entries outnumber the loud ones so it stays company rather than
+// an interruption.
+const TYPING_ACT = [
+  { key: 'typing', w: 4.5 },
+  { key: 'working', w: 3 },
+  { key: 'focused', w: 3 },
+  { key: 'reading', w: 2.2 },
+  { key: 'determined', w: 1.6 },
+  { key: 'zen', w: 1.2 },
+  { key: 'grooving', w: 1.4, fx: 'note' },
+  { key: 'humming', w: 1.2, fx: 'note' },
+  { key: 'daydreaming', w: 1, fx: 'think' },
+  { key: 'peek', w: 1 },
+  { key: 'stretching', w: 0.8 },
+  { key: 'yawning', w: 0.7 },
+  { key: 'cozy', w: 0.7 },
+];
+
+function updateTypingAct(dt) {
+  // Its own business while typing, but not while it is being handled, asleep,
+  // or deliberately kept quiet.
+  const on = attention.typing && attention.typingFor > 1
+    && !S.dragging && !brain.asleep && !brain.suppressed && !S.settings.focusMode;
+  if (!on) {
+    S.typingBeat = 0;
+    S.typingFor = 0;
+    return;
+  }
+
+  S.typingFor += dt;
+  S.typingBeat -= dt;
+  if (S.typingBeat > 0) return;
+  // Longer gaps as the stretch goes on: it settles in rather than fidgeting.
+  S.typingBeat = rand(3.4, 6.5) + Math.min(4, S.typingFor * 0.06);
+
+  const total = TYPING_ACT.reduce((s, a) => s + a.w, 0);
+  let r = Math.random() * total;
+  let act = TYPING_ACT[0];
+  for (const a of TYPING_ACT) { r -= a.w; if (r <= 0) { act = a; break; } }
+
+  setEmotion(act.key, { sticky: true, hold: 0 });
+  if (act.fx) fx.burst(act.fx, S.fxOrigin, 3);
+  // Chattier bots pipe up more often, but never more than about once a minute.
+  const chatty = 0.06 + (S.settings.chatty ?? 0.5) * 0.14;
+  if (S.settings.chatter && chance(chatty)) speak(say(chance(0.5) ? 'typing' : 'typingLong'));
 }
 
 function onAttentionEvent(ev) {
@@ -721,6 +776,9 @@ function frame(now) {
   // so letting go of a window does not snap the body to a halt.
   physics.trackTight = approach(physics.trackTight, attention.tracking ? 1 : 0, 6, dt);
 
+  // ---- what it gets up to while you type
+  updateTypingAct(dt);
+
   // ---- how long you have actually been at this
   for (const ev of focus.update(dt, {
     chatty: S.settings.focusReports && !S.settings.focusMode && !brain.asleep,
@@ -1033,6 +1091,8 @@ const COMMANDS = {
 
 // ---------------------------------------------------------------- boot
 api.onSettings(applySettings);
+// Which pack it speaks from. Resolved by main, because 'auto' means the OS locale.
+api.onLanguage?.((l) => setLanguage(l));
 api.onLayout(layout);
 api.onCursor(onCursor);
 api.onDisplays((list) => { physics.setDisplays(list); S.hostId = null; });
@@ -1078,6 +1138,7 @@ api.ready().then((boot) => {
   layout(boot.window);
   // Seed the meters BEFORE settings, so personality is applied to a brain that
   // already remembers how it feels about you.
+  setLanguage(boot.lang);
   brain.loadBond(boot.bond);
   S.shelf = Array.isArray(boot.shelf) ? boot.shelf : [];
   applySettings(boot.settings);

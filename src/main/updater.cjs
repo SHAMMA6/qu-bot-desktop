@@ -172,20 +172,6 @@ class Updater {
     return true;
   }
 
-  // A short line for menus and the settings window.
-  get label() {
-    const s = this.state;
-    switch (s.status) {
-      case 'unsupported': return `Updates: ${s.reason}`;
-      case 'checking': return 'Checking for updates…';
-      case 'available': return `Update ${s.version} available`;
-      case 'downloading': return `Downloading update… ${s.percent}%`;
-      case 'ready': return `Restart to update to ${s.version}`;
-      case 'none': return 'Up to date';
-      case 'error': return `Update check failed: ${s.reason}`;
-      default: return 'Check for updates';
-    }
-  }
 }
 
 module.exports = { Updater, updateCapability };

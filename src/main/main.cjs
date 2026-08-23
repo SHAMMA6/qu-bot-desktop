@@ -9,7 +9,7 @@ const {
 } = require('electron');
 
 const { Store } = require('./store.cjs');
-const { loadCatalog, buildContextMenu, buildTrayMenu } = require('./menus.cjs');
+const { loadCatalog, setMenuLanguage, buildContextMenu, buildTrayMenu } = require('./menus.cjs');
 const { Awareness } = require('./awareness.cjs');
 const { Timers } = require('./timers.cjs');
 const { Updater } = require('./updater.cjs');
@@ -40,6 +40,18 @@ let updater = null;
 let announcedUpdate = null;   // version we have already told the user about
 let lastCpuSample = null;
 let session = null;      // what startSession() told us about this launch
+let i18n = null;         // the shared string table, loaded with the catalog
+let lang = 'en';         // 'auto' resolved against the system locale
+
+// One place decides what language everything is in: the setting, resolved
+// against the OS locale, pushed to the menus and to both renderers. Without a
+// single resolver the tray could be in Arabic while the settings window is not.
+function applyLanguage() {
+  if (!i18n) return lang;
+  lang = i18n.resolveLanguage(store.get('language'), app.getLocale());
+  setMenuLanguage(lang);
+  return lang;
+}
 
 // ---------------------------------------------------------------- geometry
 // The overlay covers exactly ONE display at a time and follows the mascot between
@@ -368,7 +380,7 @@ function refreshTray() {
     onCancelTimer: (id) => { timers?.cancel(id); refreshTray(); },
     onPomodoro: startOrStopPomodoro,
     onShelf: shelfAction,
-    update: updater ? { ...updater.state, label: updater.label } : null,
+    update: updater ? updater.state : null,
     onInstallUpdate: () => updater?.install(),
     onCheckUpdate: checkForUpdatesNow,
     onQuit: () => { app.isQuitting = true; app.quit(); },
@@ -423,6 +435,13 @@ function updateSettings(patch) {
   }
   if (patch.watchActivity !== undefined && awareness) {
     if (next.watchActivity) awareness.start(); else awareness.stop();
+  }
+  if (patch.language !== undefined) {
+    applyLanguage();
+    // Both windows redraw their own chrome; the mascot also switches which
+    // dialogue pack it speaks from.
+    send("language", lang);
+    if (settingsWin && !settingsWin.isDestroyed()) settingsWin.webContents.send("language", lang);
   }
   if (patch.focusMode !== undefined) {
     if (hidden && next.focusMode) toggleVisible(true);
@@ -518,6 +537,7 @@ ipcMain.handle('bot:ready', () => {
   const b = overlay.getBounds();
   return {
     settings: store.all,
+    lang,
     window: { x: host.bounds.x, y: host.bounds.y, width: b.width, height: b.height },
     displays: displayList(),
     hostId: host.id,
@@ -565,7 +585,7 @@ ipcMain.on('bot:menu', (_e, ctx) => {
     onCancelTimer: (id) => { timers?.cancel(id); refreshTray(); },
     onPomodoro: startOrStopPomodoro,
     onShelf: shelfAction,
-    update: updater ? { ...updater.state, label: updater.label } : null,
+    update: updater ? updater.state : null,
     onInstallUpdate: () => updater?.install(),
     onCheckUpdate: checkForUpdatesNow,
     onHide: () => toggleVisible(false),
@@ -590,6 +610,7 @@ ipcMain.on('bot:emotion', (_e, key) => {
 });
 
 ipcMain.handle('settings:get', () => store.all);
+ipcMain.handle('lang:get', () => lang);
 ipcMain.on('settings:reset', () => {
   const next = store.reset();
   send('settings', next);
@@ -599,11 +620,11 @@ ipcMain.on('settings:reset', () => {
 ipcMain.on('settings:command', (_e, name, payload) => command(name, payload));
 
 ipcMain.handle('update:get', () => (updater
-  ? { ...updater.state, label: updater.label, version: updater.state.version, current: app.getVersion() }
-  : { status: 'unsupported', reason: 'not ready yet', label: 'Updates unavailable', current: app.getVersion() }));
+  ? { ...updater.state, current: app.getVersion() }
+  : { status: 'unsupported', reason: 'not ready yet', current: app.getVersion() }));
 ipcMain.handle('update:check', async () => {
   await checkForUpdatesNow();
-  return updater ? { ...updater.state, label: updater.label, current: app.getVersion() } : null;
+  return updater ? { ...updater.state, current: app.getVersion() } : null;
 });
 ipcMain.handle('update:install', () => !!updater?.install());
 
@@ -650,7 +671,19 @@ if (!app.requestSingleInstanceLock()) {
     session = store.startSession();
 
     // Menu labels come from the same ES modules the renderer uses.
-    await loadCatalog();
+    const catalog = await loadCatalog();
+    i18n = await import("../shared/i18n.js");
+    applyLanguage();
+    // A settings file written by an older build can still name a shape that has
+    // since been retired. Pull it back onto one that exists before anything
+    // draws it or builds a menu out of it.
+    if (!catalog.SHAPES.some((s) => s.key === store.get('shape'))) {
+      store.set({ shape: catalog.SHAPES[0].key });
+    }
+    // Same for what it is wearing, against the real roster in mark.js.
+    const worn = store.get('accessory');
+    const known = ['auto', 'none', ...catalog.ACCESSORY_GROUPS.flatMap((g) => g.keys)];
+    if (!known.includes(worn)) store.set({ accessory: 'auto' });
 
     createOverlay();
     createTray();
@@ -673,7 +706,6 @@ if (!app.requestSingleInstanceLock()) {
 
     globalShortcut.register('Control+Alt+B', summon);
     globalShortcut.register('Control+Alt+H', () => toggleVisible());
-    globalShortcut.register('Control+Alt+C', () => command('celebrate'));
     // Park on the home spot and go quiet.
     globalShortcut.register('Control+Alt+F', () => updateSettings({ focusMode: !store.get('focusMode') }));
     // "How long have I been at this?"

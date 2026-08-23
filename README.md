@@ -61,33 +61,54 @@ npm run build
 
 ## What it does
 
-**42 emotions**, each a complete performance rather than just a face — its own eye
+**78 emotions**, each a complete performance rather than just a face — its own eye
 geometry, breathing rate, posture, lean, blink rhythm, eyelid droop, gaze
 behaviour, jitter and particle effect.
 
 | Group | Emotions |
 | --- | --- |
-| Everyday | idle, neutral, happy, content, listening, talking |
-| Delighted | excited, smitten, laughing, celebrating, proud, smug, wink, shy |
-| Attentive | curious, confused, thinking, focused, working, alert |
-| Startled | surprised, shocked, scared, dizzy |
-| Low | sad, pleading, bored, sleepy, asleep |
-| Spiky | annoyed, angry, skeptical, glitched |
+| Everyday | idle, neutral, happy, content, listening, talking, cosy, zen |
+| Delighted | excited, smitten, laughing, celebrating, proud, smug, wink, shy, grateful, hopeful, starstruck, triumphant, cheering, relieved, playful, up to something |
+| Attentive | curious, confused, thinking, focused, working, alert, reading, typing along, searching, determined, suspicious, daydreaming |
+| Startled | surprised, shocked, scared, dizzy, amazed, impressed, wrong way |
+| Low | sad, pleading, bored, sleepy, asleep, where did you go, sulking, sorry, yawning |
+| Spiky | annoyed, angry, skeptical, glitched, not having it, told you, nervous, embarrassed, glitching |
+| Doing something | grooving, humming, stretching, waving, taking a picture |
+| The room | chilly, overheated, peckish |
 | Glances | look left / right / up / down, peeking |
 | Physical | held, falling, squished, walking |
 
-![The 42 expressions](assets/emotions.png)
+![The 25 expression eye-rings](assets/emotions.png)
 
 *Eye geometry only — the posture, eyelid droop, motion and effects that carry
-most of each emotion do not survive a still frame.*
+most of each emotion do not survive a still frame. Every pair is centred on the
+head: an expression carries the shape of the eyes, never their position, because
+position is what gaze is for.*
 
-**18 body shapes** — blob, pebble, bean, egg, squircle, tablet, capsule, cylinder,
-hex, gem, crystal, wedge, shield, dome, arch, cloud, teardrop, leaf. Each carries
-its own face-fitting transform, so the eyes sit correctly on a narrow capsule and
-a wide cloud alike.
+**You do not pick them.** There is no feelings menu and no action buttons — what
+it feels is its own business, reached by weight from mood, energy, boredom,
+affection and personality, and from what you are actually doing. That is the
+whole point of a companion rather than a toy: you cannot press "be happy".
+
+**It gets on with something while you type.** Typing is most of what anyone does
+at a desk, so it is the state worth filling. Rather than one reaction at the
+start of a burst and then twenty seconds of nothing, it runs a rolling little
+performance for as long as your hands are on the keys — keeping time, reading
+over your shoulder, humming, stretching, drifting off — settling into longer
+gaps the longer the stretch goes on.
+
+**5 body shapes** — circle, wedge, square, hex and cloud. Each carries its own
+face-fitting transform, so the eyes sit correctly on a narrow wedge and a wide
+cloud alike, and so does everything it is wearing.
 
 **11 coats** plus any custom colour. The eye colour is derived from the coat's
 luminance, so a custom colour never produces unreadable eyes.
+
+**English and Arabic**, covering the menus, the settings window and everything
+it says — 319 interface strings and 73 buckets of dialogue in each, with the
+settings window laid out right-to-left in Arabic. *Automatic* follows your
+system locale. A missing string, or a translated line that drops one of its
+placeholders, fails **npm test** rather than showing up in front of a reader.
 
 ## It remembers you
 
@@ -177,11 +198,18 @@ harder it lands, a throw whistles, and it breathes while it sleeps.
 **Pick what it wears** under **Settings → Look → Wearing**, or from
 *right-click → Wearing*:
 
-| Choice | |
+| Group | |
 | --- | --- |
 | Automatic | Follows the calendar — santa hat in December, sunglasses in July, witch hat at Halloween, party hat on New Year. The settings panel tells you what that means today |
 | Nothing | Bare |
-| Santa / Witch / Party / Sunglasses | Worn all year, whatever the date |
+| Hair | Fringe, side-swept, curls, afro, mohawk, top knot, ponytail, braids, long hair |
+| Hats | Beanie, cap, top hat, crown, mortarboard, chef, cowboy, headband, santa, witch, party, flower, bow, halo, horns, antenna |
+| Face | Sunglasses, glasses, monocle, eyepatch, mask |
+| Extras | Headphones, earmuffs, scarf, bow tie, necktie |
+
+Thirty-five in all, and none of them use fixed coordinates: a square crown is 210
+units across where a wedge is 67, and a cloud's sits 22 units lower than a
+circle's, so every piece is authored against the body it is being worn on.
 
 **It notices the machine**: battery getting low, the charger going in, the
 network dropping, and sustained heavy CPU load.
@@ -209,7 +237,6 @@ Anywhere:
 | --- | --- |
 | `Ctrl` + `Alt` + `B` | Summon it to your cursor |
 | `Ctrl` + `Alt` + `H` | Hide / show |
-| `Ctrl` + `Alt` + `C` | Celebrate |
 | `Ctrl` + `Alt` + `F` | Focus mode on / off |
 | `Ctrl` + `Alt` + `L` | How long have I been at this? |
 | `Ctrl` + `Alt` + `P` | Park it at my cursor |
@@ -290,7 +317,7 @@ src/
     settings.html/css/js Settings window with a live preview
     lib/
       mark.js            Body + eye rendering
-      emotions.js        The 42-emotion table
+      emotions.js        The 78-emotion table
       behavior.js        Autonomy: meters and action selection
       attention.js       Where it wants to be, and what it noticed you doing
       focus.js           Active time per app, and the patterns worth mentioning
@@ -484,7 +511,7 @@ No to Yes. It needs a paid Apple Developer account, after which
 
 ## Credits
 
-The character's geometry — 18 body shapes, 25 expression eye-rings, the
+The character's geometry — 5 body shapes, 25 expression eye-rings, the
 per-shape face-fitting transforms and the gold star — follows the Grok Bot mark
 published at [x.ai](https://x.ai). Everything else here (the emotion system,
 autonomy, physics, effects, dialogue and app shell) is original.

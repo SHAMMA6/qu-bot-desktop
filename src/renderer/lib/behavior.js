@@ -226,7 +226,7 @@ export class Brain {
   act(ctx) {
     const opts = [];
     const w = (weight, fn) => { if (weight > 0) opts.push({ weight, fn }); };
-    const { chatty, clingy } = this.persona;
+    const { chatty, clingy, sassy } = this.persona;
     const talks = this.enabled.chatter ? 0.3 + chatty * 1.9 : 0;
 
     // A rare line that only exists once you have known each other a while.
@@ -257,6 +257,20 @@ export class Brain {
       this.emit({ type: 'say', text: say('idleMusing'), delay: 0.3 });
     });
     w(this.mood * 2.4, () => this.emit({ type: 'emotion', key: pick(['happy', 'content', 'wink']) }));
+
+    // The wider roster. All of it is reached by weight from here rather than by
+    // being picked off a menu, so which of the 78 you ever see is a function of
+    // mood, energy, boredom and personality — not of what you clicked.
+    w(this.mood * 1.5, () => this.emit({ type: 'emotion', key: pick(['cozy', 'zen', 'humming', 'grateful']) }));
+    w(this.mood * 1.2 * (0.4 + sassy), () =>
+      this.emit({ type: 'emotion', key: pick(['playful', 'mischievous', 'smug', 'vindicated']) }));
+    w(1.3, () => this.emit({ type: 'emotion', key: pick(['daydreaming', 'searching', 'suspicious', 'hopeful']) }));
+    w(this.boredom * 1.8, () => this.emit({ type: 'emotion', key: pick(['stretching', 'yawning', 'hungry']) }));
+    w((1 - this.mood) * 1.2, () =>
+      this.emit({ type: 'emotion', key: pick(['sulking', 'lonely', 'apologetic', 'nervous']) }));
+    w(this.affection * 1.4, () => this.emit({ type: 'emotion', key: pick(['starstruck', 'impressed', 'waving']) }));
+    w(this.energy > 0.7 ? 1.2 : 0, () => this.emit({ type: 'emotion', key: pick(['determined', 'grooving']) }));
+
     w(this.affection * 2 * (0.5 + clingy), () => {
       this.emit({ type: 'emotion', key: 'love' });
     });

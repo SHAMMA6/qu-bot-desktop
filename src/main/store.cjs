@@ -12,9 +12,11 @@ const { app } = require('electron');
 
 const DEFAULTS = {
   name: 'QU Bot',
+  // 'auto' follows the system locale; 'en' / 'ar' pin it.
+  language: 'auto',
   coat: 'chalk',
   customCoat: '#885CF5',
-  shape: 'blob',
+  shape: 'circle',
   size: 128,
   opacity: 1,
   gravity: false,        // off = it flies; on = the old grounded desk pet
@@ -75,8 +77,11 @@ const BOND_DEFAULTS = {
   boredom: 0,
 };
 
-// Everything it can wear. 'auto' picks by date; 'none' is bare.
-const ACCESSORIES = ['auto', 'none', 'santa', 'witch', 'party', 'shades'];
+// The wearables roster lives in mark.js, which is an ES module this process
+// cannot require synchronously — and duplicating 35 names here is how the list
+// silently goes stale, which is exactly what happened to the first six. So the
+// store only checks the shape of the value; main prunes an unknown one against
+// the real roster once the catalog has loaded.
 
 const num = (v, lo, hi, fallback) => {
   const n = Number(v);
@@ -131,7 +136,9 @@ class Store {
     d.clingy = num(d.clingy, 0, 1, DEFAULTS.clingy);
     d.sassy = num(d.sassy, 0, 1, DEFAULTS.sassy);
     d.pomodoroWork = Math.round(num(d.pomodoroWork, 5, 120, DEFAULTS.pomodoroWork));
-    if (!ACCESSORIES.includes(d.accessory)) d.accessory = DEFAULTS.accessory;
+    if (typeof d.accessory !== 'string' || !/^[a-zA-Z]{2,24}$/.test(d.accessory)) {
+      d.accessory = DEFAULTS.accessory;
+    }
     d.pomodoroBreak = Math.round(num(d.pomodoroBreak, 1, 60, DEFAULTS.pomodoroBreak));
 
     if (typeof d.customCoat !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(d.customCoat)) {
@@ -144,6 +151,8 @@ class Store {
       .join('')
       .trim()
       .slice(0, 24) || DEFAULTS.name;
+
+    if (!['auto', 'en', 'ar'].includes(d.language)) d.language = 'auto';
 
     if (d.home && typeof d.home === 'object' && Number.isFinite(Number(d.home.x))
         && Number.isFinite(Number(d.home.y))) {
@@ -301,4 +310,4 @@ class Store {
   }
 }
 
-module.exports = { Store, DEFAULTS, BOND_DEFAULTS, ACCESSORIES };
+module.exports = { Store, DEFAULTS, BOND_DEFAULTS };

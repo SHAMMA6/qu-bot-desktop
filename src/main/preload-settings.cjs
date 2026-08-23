@@ -7,6 +7,11 @@ contextBridge.exposeInMainWorld('qubotSettings', {
   command: (name, payload) => ipcRenderer.send('settings:command', name, payload),
   onSettings: (cb) => ipcRenderer.on('settings', (_e, v) => cb(v)),
 
+  // The resolved interface language: the setting can say 'auto', only main
+  // knows what that turned into.
+  lang: () => ipcRenderer.invoke('lang:get'),
+  onLanguage: (cb) => ipcRenderer.on('language', (_e, v) => cb(v)),
+
   // What it remembers about the two of you.
   bond: () => ipcRenderer.invoke('bond:get'),
   forgetBond: () => ipcRenderer.invoke('bond:forget'),

@@ -220,7 +220,7 @@ function main() {
   fs.mkdirSync(OUT, { recursive: true });
 
   // App icon: the brand silhouette in violet with white eyes.
-  const app = { shape: 'blob', expression: 0, coat: '#885CF5', ink: '#FFFFFF', data };
+  const app = { shape: 'circle', expression: 0, coat: '#885CF5', ink: '#FFFFFF', data };
   // The ICO format tops out at 256px, but macOS refuses to build an .icns from
   // anything smaller than 512 — and 1024 is what a Retina dock actually wants.
   // So the master PNG is rendered separately from the ICO's ladder.
@@ -236,7 +236,7 @@ function main() {
     for (const s of [16, 20, 24, 32]) {
       fs.writeFileSync(
         path.join(OUT, `${name}${s === 16 ? '' : `@${s}`}.png`),
-        render(s, { shape: 'blob', expression: 0, coat, ink: ink === '#000000' ? '#000000' : ink, padding: 0.02, data }),
+        render(s, { shape: 'circle', expression: 0, coat, ink: ink === '#000000' ? '#000000' : ink, padding: 0.02, data }),
       );
     }
   }

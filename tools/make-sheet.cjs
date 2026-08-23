@@ -33,9 +33,9 @@ function main() {
     items = Object.keys(data.shapes).map((k) => ({ shape: k, expression: 10, label: k }));
   } else if (mode === 'emotions') {
     const E = loadEmotions();
-    items = Object.entries(E).map(([k, v]) => ({ shape: 'blob', expression: v.expr, label: k }));
+    items = Object.entries(E).map(([k, v]) => ({ shape: 'circle', expression: v.expr, label: k }));
   } else {
-    items = data.expressions.map((_, i) => ({ shape: 'blob', expression: i, label: String(i) }));
+    items = data.expressions.map((_, i) => ({ shape: 'circle', expression: i, label: String(i) }));
   }
 
   const rows = Math.ceil(items.length / cols);

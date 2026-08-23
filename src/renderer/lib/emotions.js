@@ -289,20 +289,263 @@ export const EMOTIONS = {
     lean: 10, scale: 0.97, yOffset: 3, blink: [1.6, 4], gaze: 'follow', gazeGain: 1.1,
     jitter: 0, blush: 0.3, star: 0, fx: null, hold: 3, settle: 7,
   },
+
+  // ---------------- doing something ----------------
+  // These are the ones with a visible activity behind them. Every one is reached
+  // by the brain noticing something, never by being picked off a list.
+  grooving: {
+    label: 'Grooving', emoji: '\u{1F3A7}', expr: 4, eye: 1,
+    breathe: { amp: 0.05, rate: 1.9 }, bob: { amp: 7, rate: 1.9 }, sway: { amp: 11, rate: 0.95 },
+    lean: 0, scale: 1.01, yOffset: 0, blink: [1.6, 3.4], gaze: 'fixed', gazeGain: 0,
+    jitter: 0, blush: 0.2, star: 0, fx: 'note', hold: 7, settle: 6,
+  },
+  humming: {
+    label: 'Humming', emoji: '\u{1F3B5}', expr: 4, eye: 1,
+    breathe: { amp: 0.026, rate: 0.9 }, bob: { amp: 3, rate: 0.75 }, sway: { amp: 3.4, rate: 0.5 },
+    lean: 0, scale: 1, yOffset: 0, blink: [2, 4.5], gaze: 'wander', gazeGain: 0.5,
+    jitter: 0, blush: 0.14, star: 0, fx: 'note', hold: 6, settle: 6,
+  },
+  reading: {
+    label: 'Reading', emoji: '\u{1F4D6}', expr: 6, eye: 1.02,
+    breathe: { amp: 0.014, rate: 0.5 }, bob: { amp: 1.2, rate: 0.34 }, sway: { amp: 0.7, rate: 0.24 },
+    lean: 4, scale: 1, yOffset: 2, blink: [2.4, 5.5], gaze: 'down', gazeGain: 0.8,
+    lidBias: 0.12, jitter: 0, blush: 0, star: 0, fx: null, hold: 9, settle: 7,
+  },
+  typing: {
+    label: 'Typing along', emoji: '\u{2328}', expr: 6, eye: 1,
+    breathe: { amp: 0.018, rate: 1.5 }, bob: { amp: 2.2, rate: 3.1 }, sway: { amp: 1.1, rate: 1.6 },
+    lean: 3, scale: 1, yOffset: 1, blink: [2.2, 5], gaze: 'down', gazeGain: 0.55,
+    jitter: 0.25, blush: 0, star: 0, fx: null, hold: 6, settle: 8,
+  },
+  photographing: {
+    label: 'Taking a picture', emoji: '\u{1F4F8}', expr: 12, eye: 1.05,
+    breathe: { amp: 0.012, rate: 0.5 }, bob: { amp: 0.8, rate: 0.3 }, sway: { amp: 0.5, rate: 0.2 },
+    lean: 0, scale: 1.02, yOffset: 0, blink: [3, 6], gaze: 'follow', gazeGain: 0.9,
+    jitter: 0, blush: 0, star: 0.3, fx: 'sparkle', hold: 3.2, settle: 9,
+  },
+  searching: {
+    label: 'Searching', emoji: '\u{1F50D}', expr: 18, eye: 1.06,
+    breathe: { amp: 0.022, rate: 0.85 }, bob: { amp: 2.6, rate: 0.7 }, sway: { amp: 4.5, rate: 0.55 },
+    lean: 8, scale: 1.01, yOffset: -1, blink: [1.7, 4], gaze: 'wander', gazeGain: 1.25,
+    jitter: 0, blush: 0, star: 0, fx: 'question', hold: 4.5, settle: 7,
+  },
+  daydreaming: {
+    label: 'Daydreaming', emoji: '\u{2601}', expr: 8, eye: 1,
+    breathe: { amp: 0.02, rate: 0.4 }, bob: { amp: 3.6, rate: 0.28 }, sway: { amp: 2.4, rate: 0.2 },
+    lean: -6, scale: 1, yOffset: -3, blink: [2.8, 7], gaze: 'wander', gazeGain: 0.7,
+    lidBias: 0.2, jitter: 0, blush: 0.12, star: 0, fx: 'think', hold: 7, settle: 5,
+  },
+  stretching: {
+    label: 'Stretching', emoji: '\u{1F938}', expr: 4, eye: 1,
+    breathe: { amp: 0.07, rate: 0.5 }, bob: { amp: 2, rate: 0.4 }, sway: { amp: 2, rate: 0.3 },
+    lean: 0, scale: 1.06, yOffset: -4, blink: [2, 5], gaze: 'fixed', gazeGain: 0,
+    jitter: 0, blush: 0, star: 0, fx: null, hold: 2.4, settle: 5,
+  },
+  yawning: {
+    label: 'Yawning', emoji: '\u{1F971}', expr: 1, eye: 1.04,
+    breathe: { amp: 0.045, rate: 0.35 }, bob: { amp: 2.4, rate: 0.3 }, sway: { amp: 1.4, rate: 0.24 },
+    lean: 0, scale: 1.03, yOffset: 1, blink: [1.2, 2.6], gaze: 'fixed', gazeGain: 0,
+    lidBias: 0.5, jitter: 0, blush: 0, star: 0, fx: null, hold: 2.6, settle: 5,
+  },
+  waving: {
+    label: 'Waving', emoji: '\u{1F44B}', expr: 4, eye: 1,
+    breathe: { amp: 0.03, rate: 1 }, bob: { amp: 3.4, rate: 1.1 }, sway: { amp: 13, rate: 1.4 },
+    lean: 0, scale: 1.02, yOffset: -2, blink: [1.8, 4], gaze: 'follow', gazeGain: 1,
+    jitter: 0, blush: 0.2, star: 0, fx: null, hold: 2.6, settle: 8,
+  },
+
+  // ---------------- warmer ----------------
+  grateful: {
+    label: 'Grateful', emoji: '\u{1F64F}', expr: 4, eye: 1,
+    breathe: { amp: 0.024, rate: 0.6 }, bob: { amp: 2, rate: 0.45 }, sway: { amp: 1.6, rate: 0.32 },
+    lean: 0, scale: 1.01, yOffset: 0, blink: [2, 5], gaze: 'follow', gazeGain: 0.8,
+    jitter: 0, blush: 0.45, star: 0, fx: 'heart', hold: 3.4, settle: 6,
+  },
+  hopeful: {
+    label: 'Hopeful', emoji: '\u{2728}', expr: 2, eye: 1.05,
+    breathe: { amp: 0.03, rate: 0.7 }, bob: { amp: 3, rate: 0.6 }, sway: { amp: 1.8, rate: 0.35 },
+    lean: -3, scale: 1.02, yOffset: -3, blink: [2.2, 5], gaze: 'wander', gazeGain: 0.9,
+    jitter: 0, blush: 0.2, star: 0.35, fx: 'sparkle', hold: 3.4, settle: 6,
+  },
+  starstruck: {
+    label: 'Starstruck', emoji: '\u{1F929}', expr: 2, eye: 1.12,
+    breathe: { amp: 0.04, rate: 1 }, bob: { amp: 3.6, rate: 0.9 }, sway: { amp: 2.6, rate: 0.6 },
+    lean: 0, scale: 1.04, yOffset: -3, blink: [2.6, 6], gaze: 'follow', gazeGain: 1,
+    jitter: 0, blush: 0.5, star: 1, fx: 'star', hold: 3.2, settle: 8,
+  },
+  triumphant: {
+    label: 'Triumphant', emoji: '\u{1F3C6}', expr: 13, eye: 1.04,
+    breathe: { amp: 0.04, rate: 0.8 }, bob: { amp: 4, rate: 0.7 }, sway: { amp: 2.2, rate: 0.4 },
+    lean: 0, scale: 1.05, yOffset: -5, blink: [2.4, 5.5], gaze: 'fixed', gazeGain: 0,
+    jitter: 0, blush: 0.2, star: 0.6, fx: 'confetti', hold: 3.4, settle: 8,
+  },
+  cheering: {
+    label: 'Cheering', emoji: '\u{1F4E3}', expr: 2, eye: 1.06,
+    breathe: { amp: 0.05, rate: 1.4 }, bob: { amp: 6, rate: 1.5 }, sway: { amp: 5, rate: 1.1 },
+    lean: 0, scale: 1.04, yOffset: -4, blink: [1.8, 4], gaze: 'fixed', gazeGain: 0,
+    jitter: 0, blush: 0.3, star: 0.2, fx: 'confetti', hold: 3, settle: 9,
+  },
+  relieved: {
+    label: 'Relieved', emoji: '\u{1F60C}', expr: 13, eye: 1,
+    breathe: { amp: 0.05, rate: 0.4 }, bob: { amp: 2.6, rate: 0.32 }, sway: { amp: 1.4, rate: 0.26 },
+    lean: 0, scale: 1, yOffset: 2, blink: [2, 4.5], gaze: 'fixed', gazeGain: 0,
+    lidBias: 0.24, jitter: 0, blush: 0.16, star: 0, fx: 'steam', hold: 3.2, settle: 5,
+  },
+  cozy: {
+    label: 'Cosy', emoji: '\u{1F9E3}', expr: 4, eye: 1,
+    breathe: { amp: 0.03, rate: 0.34 }, bob: { amp: 2.2, rate: 0.26 }, sway: { amp: 1.2, rate: 0.2 },
+    lean: 0, scale: 1.01, yOffset: 2, blink: [2.6, 6], gaze: 'fixed', gazeGain: 0,
+    lidBias: 0.2, jitter: 0, blush: 0.34, star: 0, fx: null, hold: 7, settle: 4,
+  },
+  zen: {
+    label: 'Zen', emoji: '\u{1F9D8}', expr: 22, eye: 1,
+    breathe: { amp: 0.03, rate: 0.22 }, bob: { amp: 1.6, rate: 0.18 }, sway: { amp: 0.6, rate: 0.14 },
+    lean: 0, scale: 1, yOffset: 0, blink: null, gaze: 'fixed', gazeGain: 0,
+    jitter: 0, blush: 0, star: 0, fx: null, hold: 9, settle: 4,
+  },
+  playful: {
+    label: 'Playful', emoji: '\u{1F61C}', expr: 14, eye: 1.03,
+    breathe: { amp: 0.04, rate: 1.1 }, bob: { amp: 4.4, rate: 1 }, sway: { amp: 6, rate: 0.8 },
+    lean: 7, scale: 1.02, yOffset: -2, blink: [1.4, 3.4], gaze: 'follow', gazeGain: 1.1,
+    jitter: 0, blush: 0.3, star: 0, fx: 'sparkle', hold: 2.8, settle: 8,
+  },
+  mischievous: {
+    label: 'Up to something', emoji: '\u{1F608}', expr: 16, eye: 1.02,
+    breathe: { amp: 0.026, rate: 0.8 }, bob: { amp: 2.4, rate: 0.6 }, sway: { amp: 3, rate: 0.45 },
+    lean: 11, scale: 1.01, yOffset: 0, blink: [1.6, 3.8], gaze: 'follow', gazeGain: 1.2,
+    lidBias: 0.16, jitter: 0, blush: 0.18, star: 0, fx: 'sparkle', hold: 3.2, settle: 7,
+  },
+
+  // ---------------- edgier ----------------
+  vindicated: {
+    label: 'Told you', emoji: '\u{1F60F}', expr: 22, eye: 1,
+    breathe: { amp: 0.024, rate: 0.55 }, bob: { amp: 2, rate: 0.4 }, sway: { amp: 1.4, rate: 0.28 },
+    lean: -7, scale: 1.03, yOffset: -1, blink: [2.2, 5], gaze: 'follow', gazeGain: 0.7,
+    lidBias: 0.2, jitter: 0, blush: 0, star: 0, fx: null, hold: 3, settle: 6,
+  },
+  exasperated: {
+    label: 'Not having it', emoji: '\u{1F624}', expr: 7, eye: 1.02,
+    breathe: { amp: 0.05, rate: 1.3 }, bob: { amp: 2, rate: 1 }, sway: { amp: 2, rate: 1.1 },
+    lean: 0, scale: 1.05, yOffset: 0, blink: [1.6, 3.6], gaze: 'follow', gazeGain: 0.8,
+    jitter: 0.5, blush: 0, star: 0, fx: 'steam', hold: 2.6, settle: 9,
+  },
+  suspicious: {
+    label: 'Suspicious', emoji: '\u{1F9D0}', expr: 5, eye: 1.02,
+    breathe: { amp: 0.016, rate: 0.5 }, bob: { amp: 1.4, rate: 0.38 }, sway: { amp: 1, rate: 0.26 },
+    lean: 6, scale: 1, yOffset: 0, blink: [2.6, 6], gaze: 'follow', gazeGain: 1.15,
+    lidBias: 0.26, jitter: 0, blush: 0, star: 0, fx: null, hold: 3.4, settle: 7,
+  },
+  sulking: {
+    label: 'Sulking', emoji: '\u{1F612}', expr: 22, eye: 1,
+    breathe: { amp: 0.018, rate: 0.4 }, bob: { amp: 1.4, rate: 0.3 }, sway: { amp: 0.8, rate: 0.2 },
+    lean: -10, scale: 0.98, yOffset: 3, blink: [2.4, 6], gaze: 'away', gazeGain: 0.9,
+    lidBias: 0.3, jitter: 0, blush: 0, star: 0, fx: null, hold: 4.5, settle: 5,
+  },
+  nervous: {
+    label: 'Nervous', emoji: '\u{1F62C}', expr: 11, eye: 1.02,
+    breathe: { amp: 0.035, rate: 1.5 }, bob: { amp: 1.6, rate: 1.2 }, sway: { amp: 1.6, rate: 1.4 },
+    lean: 0, scale: 0.99, yOffset: 1, blink: [1, 2.4], gaze: 'follow', gazeGain: 0.7,
+    jitter: 0.55, blush: 0.2, star: 0, fx: 'sweat', hold: 3.2, settle: 8,
+  },
+  embarrassed: {
+    label: 'Embarrassed', emoji: '\u{1F633}', expr: 24, eye: 1,
+    breathe: { amp: 0.03, rate: 0.9 }, bob: { amp: 1.8, rate: 0.7 }, sway: { amp: 1.4, rate: 0.5 },
+    lean: -5, scale: 0.98, yOffset: 2, blink: [1.4, 3.2], gaze: 'away', gazeGain: 1,
+    jitter: 0.15, blush: 1, star: 0, fx: 'steam', hold: 3.4, settle: 7,
+  },
+  apologetic: {
+    label: 'Sorry', emoji: '\u{1F614}', expr: 17, eye: 1,
+    breathe: { amp: 0.018, rate: 0.42 }, bob: { amp: 1.4, rate: 0.32 }, sway: { amp: 0.9, rate: 0.22 },
+    lean: 0, scale: 0.98, yOffset: 4, blink: [2.2, 5], gaze: 'down', gazeGain: 0.9,
+    lidBias: 0.2, jitter: 0, blush: 0.2, star: 0, fx: null, hold: 3.4, settle: 5,
+  },
+  glitching: {
+    label: 'Glitching', emoji: '\u{26A1}', expr: 9, eye: 1.04,
+    breathe: { amp: 0.05, rate: 3 }, bob: { amp: 2, rate: 2.6 }, sway: { amp: 3, rate: 3.4 },
+    lean: 0, scale: 1.01, yOffset: 0, blink: [0.5, 1.4], gaze: 'fixed', gazeGain: 0,
+    jitter: 1.1, blush: 0, star: 0, fx: 'glitch', hold: 2.4, settle: 12,
+  },
+  disoriented: {
+    label: 'Wrong way', emoji: '\u{1F643}', expr: 21, eye: 1.06,
+    breathe: { amp: 0.04, rate: 0.9 }, bob: { amp: 4, rate: 0.7 }, sway: { amp: 16, rate: 0.9 },
+    lean: 0, scale: 1.01, yOffset: 0, blink: [1.6, 3.6], gaze: 'wander', gazeGain: 1.2,
+    jitter: 0.3, blush: 0, star: 0, fx: 'swirl', hold: 3, settle: 7,
+  },
+  lonely: {
+    label: 'Where did you go', emoji: '\u{1F97A}', expr: 20, eye: 1.04,
+    breathe: { amp: 0.02, rate: 0.5 }, bob: { amp: 2.2, rate: 0.4 }, sway: { amp: 5, rate: 0.32 },
+    lean: 0, scale: 0.99, yOffset: 1, blink: [2, 4.6], gaze: 'wander', gazeGain: 1.3,
+    jitter: 0, blush: 0.16, star: 0, fx: 'question', hold: 5.5, settle: 5,
+  },
+  amazed: {
+    label: 'Amazed', emoji: '\u{1F92F}', expr: 12, eye: 1.14,
+    breathe: { amp: 0.05, rate: 1.2 }, bob: { amp: 3, rate: 0.9 }, sway: { amp: 2, rate: 0.6 },
+    lean: 0, scale: 1.05, yOffset: -3, blink: [3, 7], gaze: 'follow', gazeGain: 1,
+    jitter: 0.2, blush: 0.2, star: 0, fx: 'shock', hold: 2.6, settle: 11,
+  },
+  impressed: {
+    label: 'Impressed', emoji: '\u{1F62E}', expr: 12, eye: 1.06,
+    breathe: { amp: 0.03, rate: 0.8 }, bob: { amp: 2.4, rate: 0.6 }, sway: { amp: 1.6, rate: 0.4 },
+    lean: 0, scale: 1.02, yOffset: -2, blink: [2.4, 5.5], gaze: 'follow', gazeGain: 0.95,
+    jitter: 0, blush: 0.14, star: 0, fx: 'ping', hold: 2.6, settle: 8,
+  },
+  determined: {
+    label: 'Determined', emoji: '\u{1F4AA}', expr: 6, eye: 1.02,
+    breathe: { amp: 0.03, rate: 0.75 }, bob: { amp: 1.6, rate: 0.5 }, sway: { amp: 0.8, rate: 0.3 },
+    lean: 0, scale: 1.03, yOffset: -2, blink: [2.6, 6], gaze: 'fixed', gazeGain: 0,
+    lidBias: 0.14, jitter: 0, blush: 0, star: 0, fx: null, hold: 5, settle: 8,
+  },
+
+  // ---------------- the machine and the room ----------------
+  chilly: {
+    label: 'Chilly', emoji: '\u{1F976}', expr: 11, eye: 1,
+    breathe: { amp: 0.03, rate: 2.2 }, bob: { amp: 1.2, rate: 1.8 }, sway: { amp: 1.2, rate: 2 },
+    lean: 0, scale: 0.98, yOffset: 2, blink: [1.4, 3.2], gaze: 'fixed', gazeGain: 0,
+    jitter: 0.8, blush: 0.26, star: 0, fx: null, hold: 3.4, settle: 7,
+  },
+  overheated: {
+    label: 'Overheated', emoji: '\u{1F975}', expr: 20, eye: 1,
+    breathe: { amp: 0.055, rate: 1.1 }, bob: { amp: 2.4, rate: 0.8 }, sway: { amp: 1.6, rate: 0.5 },
+    lean: 0, scale: 1.01, yOffset: 3, blink: [1.6, 3.6], gaze: 'fixed', gazeGain: 0,
+    lidBias: 0.24, jitter: 0.1, blush: 0.5, star: 0, fx: 'steam', hold: 3.6, settle: 6,
+  },
+  hungry: {
+    label: 'Peckish', emoji: '\u{1F60B}', expr: 18, eye: 1.02,
+    breathe: { amp: 0.03, rate: 0.9 }, bob: { amp: 2.6, rate: 0.7 }, sway: { amp: 2.4, rate: 0.5 },
+    lean: 6, scale: 1, yOffset: 1, blink: [1.8, 4.2], gaze: 'wander', gazeGain: 0.9,
+    jitter: 0, blush: 0.2, star: 0, fx: 'think', hold: 3.4, settle: 6,
+  },
 };
 
 export const EMOTION_KEYS = Object.keys(EMOTIONS);
 
-// Grouped for the context menu, so the list stays readable at 30+ entries.
-// Handling states (held/falling/squished/walking) are driven by physics, not picked by hand.
+// The roster, grouped. Nothing picks from this any more — feelings are the bot's
+// own business now, so there is no menu of them — but keeping the table means a
+// new emotion has to be filed somewhere, and `npm test` fails on any that is
+// not. That is the only thing standing between 78 entries and a junk drawer.
+// Handling states (held/falling/squished/walking) are driven by physics.
 export const EMOTION_GROUPS = [
-  { name: 'Everyday', keys: ['idle', 'neutral', 'happy', 'content', 'listening', 'talking'] },
-  { name: 'Delighted', keys: ['excited', 'love', 'laughing', 'celebrating', 'proud', 'smug', 'wink', 'shy'] },
-  { name: 'Attentive', keys: ['curious', 'confused', 'thinking', 'focused', 'working', 'alert'] },
-  { name: 'Startled', keys: ['surprised', 'shocked', 'scared', 'dizzy'] },
-  { name: 'Low', keys: ['sad', 'pleading', 'bored', 'sleepy', 'sleeping'] },
-  { name: 'Spiky', keys: ['annoyed', 'angry', 'skeptical', 'error'] },
+  { name: 'Everyday', keys: ['idle', 'neutral', 'happy', 'content', 'listening', 'talking', 'cozy', 'zen'] },
+  { name: 'Delighted', keys: ['excited', 'love', 'laughing', 'celebrating', 'proud', 'smug', 'wink', 'shy',
+    'grateful', 'hopeful', 'starstruck', 'triumphant', 'cheering', 'relieved', 'playful', 'mischievous'] },
+  { name: 'Attentive', keys: ['curious', 'confused', 'thinking', 'focused', 'working', 'alert',
+    'reading', 'typing', 'searching', 'determined', 'suspicious', 'daydreaming'] },
+  { name: 'Startled', keys: ['surprised', 'shocked', 'scared', 'dizzy', 'amazed', 'impressed', 'disoriented'] },
+  { name: 'Low', keys: ['sad', 'pleading', 'bored', 'sleepy', 'sleeping', 'lonely', 'sulking',
+    'apologetic', 'yawning'] },
+  { name: 'Spiky', keys: ['annoyed', 'angry', 'skeptical', 'error', 'exasperated', 'vindicated',
+    'nervous', 'embarrassed', 'glitching'] },
+  { name: 'Doing something', keys: ['grooving', 'humming', 'stretching', 'waving', 'photographing'] },
+  { name: 'The room', keys: ['chilly', 'overheated', 'hungry'] },
   { name: 'Glances', keys: ['lookLeft', 'lookRight', 'lookUp', 'lookDown', 'peek'] },
+];
+
+// What the settings window's preview drifts through on its own. Deliberately the
+// calm end of the roster: this is a thumbnail, not a performance.
+export const PREVIEW_REEL = [
+  'idle', 'happy', 'content', 'curious', 'listening', 'thinking', 'wink', 'shy',
+  'proud', 'grooving', 'humming', 'reading', 'daydreaming', 'hopeful', 'grateful',
+  'playful', 'cozy', 'zen', 'stretching', 'waving', 'sleepy', 'peek', 'smug',
 ];
 
 export const getEmotion = (key) => EMOTIONS[key] || EMOTIONS.idle;

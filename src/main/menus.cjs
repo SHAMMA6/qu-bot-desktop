@@ -1,53 +1,53 @@
-// Tray and right-click menus. The catalogs (emotions, shapes, coats) live in ES
-// modules shared with the renderer, so they are imported once at startup and
-// cached — there is exactly one source of truth for every label.
+// Tray and right-click menus. The catalogs (emotion labels, shapes, coats) live
+// in ES modules shared with the renderer, so they are imported once at startup
+// and cached — there is exactly one source of truth for every label.
+//
+// Every user-visible string goes through `tr()`. Both menus are rebuilt from
+// scratch on every settings change already, so switching language costs nothing
+// beyond the rebuild that was going to happen anyway.
 
 const { Menu } = require('electron');
 
 let catalog = null;
+let lang = 'en';
+let strings = null;
+
+const tr = (key, vars) => (strings ? strings.t(lang, key, vars) : key);
 
 async function loadCatalog() {
   if (catalog) return catalog;
-  const [emotions, themes, data] = await Promise.all([
+  const [emotions, themes, data, i18n, mark] = await Promise.all([
     import('../renderer/lib/emotions.js'),
     import('../shared/themes.js'),
     import('../shared/mascot-data.js'),
+    import('../shared/i18n.js'),
+    import('../renderer/lib/mark.js'),
   ]);
-  const shapes = data.default.shapes;
+  strings = i18n;
   catalog = {
     EMOTIONS: emotions.EMOTIONS,
-    EMOTION_GROUPS: emotions.EMOTION_GROUPS,
     COATS: themes.COATS,
-    SHAPES: Object.entries(shapes).map(([key, s]) => ({ key, label: s.label })),
+    SHAPES: Object.keys(data.default.shapes).map((key) => ({ key })),
+    ACCESSORY_GROUPS: mark.ACCESSORY_GROUPS,
   };
   return catalog;
 }
 
-const SIZES = [
-  { label: 'Small', value: 96 },
-  { label: 'Medium', value: 128 },
-  { label: 'Large', value: 168 },
-  { label: 'Huge', value: 220 },
-];
-
-function emotionMenu(settings, current, onCommand) {
-  return catalog.EMOTION_GROUPS.map((group) => ({
-    label: group.name,
-    submenu: group.keys.map((key) => {
-      const e = catalog.EMOTIONS[key];
-      return {
-        label: `${e.emoji}  ${e.label}`,
-        type: 'radio',
-        checked: current === key,
-        click: () => onCommand('emotion', { key }),
-      };
-    }),
-  }));
+// Called by main whenever the resolved language changes.
+function setMenuLanguage(next) {
+  lang = next || 'en';
 }
+
+const SIZES = [
+  { key: 'size.small', value: 96 },
+  { key: 'size.medium', value: 128 },
+  { key: 'size.large', value: 168 },
+  { key: 'size.huge', value: 220 },
+];
 
 function shapeMenu(settings, onSetting) {
   return catalog.SHAPES.map((s) => ({
-    label: s.label,
+    label: tr(`shape.${s.key}`),
     type: 'radio',
     checked: settings.shape === s.key,
     click: () => onSetting({ shape: s.key }),
@@ -56,14 +56,14 @@ function shapeMenu(settings, onSetting) {
 
 function coatMenu(settings, onSetting, onSettings) {
   const items = catalog.COATS.map((c) => ({
-    label: c.label,
+    label: tr(`coat.${c.key}`),
     type: 'radio',
     checked: settings.coat === c.key,
     click: () => onSetting({ coat: c.key }),
   }));
   items.push({ type: 'separator' });
   items.push({
-    label: `Custom… (${settings.customCoat})`,
+    label: tr('menu.custom', { hex: settings.customCoat }),
     type: 'radio',
     checked: settings.coat === 'custom',
     click: () => { onSetting({ coat: 'custom' }); onSettings(); },
@@ -73,29 +73,28 @@ function coatMenu(settings, onSetting, onSettings) {
 
 function sizeMenu(settings, onSetting) {
   return SIZES.map((s) => ({
-    label: `${s.label} (${s.value}px)`,
+    label: `${tr(s.key)} (${s.value}px)`,
     type: 'radio',
     checked: settings.size === s.value,
     click: () => onSetting({ size: s.value }),
   }));
 }
 
-const ACCESSORY_LABELS = [
-  ['auto', 'Automatic (by season)'],
-  ['none', 'Nothing'],
-  ['santa', 'Santa hat'],
-  ['witch', 'Witch hat'],
-  ['party', 'Party hat'],
-  ['shades', 'Sunglasses'],
-];
-
+// There are 35 wearables now, so this is grouped the way the settings window is
+// rather than being one very long list.
 function accessoryMenu(settings, onSetting) {
-  return ACCESSORY_LABELS.map(([key, label]) => ({
-    label,
-    type: 'radio',
-    checked: (settings.accessory || 'auto') === key,
-    click: () => onSetting({ accessory: key }),
-  }));
+  const worn = settings.accessory || 'auto';
+  const item = (key, label) => ({
+    label, type: 'radio', checked: worn === key, click: () => onSetting({ accessory: key }),
+  });
+  const items = [item('auto', tr('wear.auto')), item('none', tr('wear.none')), { type: 'separator' }];
+  for (const g of catalog.ACCESSORY_GROUPS || []) {
+    items.push({
+      label: tr(`wear.${g.key}`),
+      submenu: g.keys.map((k) => item(k, tr(`acc.${k}`))),
+    });
+  }
+  return items;
 }
 
 const QUICK_TIMERS = [5, 10, 15, 25, 45, 60];
@@ -110,25 +109,25 @@ const mmss = (seconds) => {
 // its remaining time so the menu doubles as the readout.
 function timerMenu(timers, onTimer, onCancelTimer, onPomodoro) {
   const items = QUICK_TIMERS.map((m) => ({
-    label: `${m} minutes`,
-    click: () => onTimer(m, `${m} minute timer`),
+    label: tr('menu.nMinutes', { n: m }),
+    click: () => onTimer(m, tr('menu.nMinutes', { n: m })),
   }));
 
   items.push({ type: 'separator' });
   items.push({
-    label: timers.pomodoro ? `Stop pomodoro (${timers.pomodoro})` : 'Start pomodoro',
+    label: timers.pomodoro ? tr('menu.stopPomodoro', { state: timers.pomodoro }) : tr('menu.startPomodoro'),
     click: () => onPomodoro(),
   });
 
   const running = timers.timers || [];
   if (running.length) {
     items.push({ type: 'separator' });
-    items.push({ label: 'Running', enabled: false });
+    items.push({ label: tr('menu.running'), enabled: false });
     for (const t of running) {
       items.push({
         label: `${t.label} — ${mmss(t.remaining)}`,
         click: () => onCancelTimer(t.id),
-        toolTip: 'Click to cancel',
+        toolTip: tr('menu.cancelTip'),
       });
     }
   }
@@ -140,86 +139,68 @@ function shelfMenu(shelf, onShelf) {
   const items = shelf.map((file) => ({
     label: file.split(/[\\/]/).pop().slice(0, 48),
     submenu: [
-      { label: 'Open', click: () => onShelf('open', file) },
-      { label: 'Show in folder', click: () => onShelf('reveal', file) },
+      { label: tr('menu.open'), click: () => onShelf('open', file) },
+      { label: tr('menu.reveal'), click: () => onShelf('reveal', file) },
       { type: 'separator' },
-      { label: 'Let go of it', click: () => onShelf('drop', file) },
+      { label: tr('menu.letGo'), click: () => onShelf('drop', file) },
     ],
   }));
   items.push({ type: 'separator' });
-  items.push({ label: 'Let go of everything', click: () => onShelf('clear') });
+  items.push({ label: tr('menu.letGoAll'), click: () => onShelf('clear') });
   return items;
 }
 
 const TOGGLES = [
-  { key: 'followCursor', label: 'Watch what you do' },
-  { key: 'watchActivity', label: 'Notice the app in front' },
-  { key: 'rideWindows', label: 'Sit on the window you are using' },
-  { key: 'gravity', label: 'Gravity (land instead of fly)' },
-  { key: 'roam', label: 'Wander around' },
-  { key: 'chatter', label: 'Speech bubbles' },
-  { key: 'sleepWhenIdle', label: 'Sleep when idle' },
-  { key: 'nudges', label: 'Occasional nudges' },
-  { key: 'gazeFollowsCursor', label: 'Eyes follow cursor' },
-  { key: 'homeWhenBusy', label: 'Wait on its spot while you work' },
-  { key: 'focusReports', label: 'Mention long stretches' },
-  { key: 'machineAware', label: 'React to battery and network' },
-  { key: 'soundEnabled', label: 'Sound' },
-  { key: 'alwaysOnTop', label: 'Always on top' },
-  { key: 'greetOnLaunch', label: 'Greet on launch' },
-  { key: 'launchOnLogin', label: 'Start with Windows' },
+  { key: 'followCursor' },
+  { key: 'watchActivity' },
+  { key: 'rideWindows' },
+  { key: 'gravity' },
+  { key: 'roam' },
+  { key: 'chatter' },
+  { key: 'sleepWhenIdle' },
+  { key: 'nudges' },
+  { key: 'gazeFollowsCursor' },
+  { key: 'homeWhenBusy' },
+  { key: 'focusReports' },
+  { key: 'machineAware' },
+  { key: 'soundEnabled' },
+  { key: 'alwaysOnTop' },
+  { key: 'greetOnLaunch' },
+  { key: 'launchOnLogin' },
 ];
 
 function behaviourMenu(settings, onSetting) {
   return TOGGLES.map((t) => ({
-    label: t.label,
+    label: tr(`toggle.${t.key}`),
     type: 'checkbox',
     checked: !!settings[t.key],
     click: (item) => onSetting({ [t.key]: item.checked }),
   }));
 }
 
-function actionItems(settings, emotion, onCommand) {
-  const asleep = emotion === 'sleeping';
-  return [
-    { label: 'Say something', click: () => onCommand('say', { emotion: 'talking', text: null }) },
-    { label: 'How long have I been at this?', accelerator: 'Ctrl+Alt+L', click: () => onCommand('report') },
-    { label: 'Hop', click: () => onCommand('hop') },
-    { label: 'Celebrate', accelerator: 'Ctrl+Alt+C', click: () => onCommand('celebrate') },
-    asleep
-      ? { label: 'Wake up', click: () => onCommand('wake') }
-      : { label: 'Take a nap', click: () => onCommand('sleep') },
-  ];
-}
-
 // The parking spot, and the switch that sends it there and shuts it up.
-const CORNER_LABELS = [
-  ['top-left', 'Top left'],
-  ['top-right', 'Top right'],
-  ['bottom-left', 'Bottom left'],
-  ['bottom-right', 'Bottom right'],
-];
+const CORNERS = ['top-left', 'top-right', 'bottom-left', 'bottom-right'];
 
 function placeItems(settings, onCommand, onSetting) {
   const items = [
     // Point and press: the most direct way to put it somewhere exact.
-    { label: 'Park it at my cursor', accelerator: 'Ctrl+Alt+P', click: () => onCommand('__homeCursor') },
+    { label: tr('menu.parkCursor'), accelerator: 'Ctrl+Alt+P', click: () => onCommand('__homeCursor') },
     {
-      label: 'Park it in a corner',
-      submenu: CORNER_LABELS.map(([key, label]) => ({
-        label, click: () => onCommand('__homeCorner', { corner: key }),
+      label: tr('menu.parkCorner'),
+      submenu: CORNERS.map((key) => ({
+        label: tr(`corner.${key}`), click: () => onCommand('__homeCorner', { corner: key }),
       })),
     },
-    { label: settings.home ? 'Move its spot to where it is now' : 'Park it where it is now',
+    { label: settings.home ? tr('menu.moveSpot') : tr('menu.parkHere'),
       click: () => onCommand('setHome') },
   ];
   if (settings.home) {
-    items.push({ label: 'Send it to its spot', click: () => onCommand('goHome') });
-    items.push({ label: 'Forget the spot', click: () => onCommand('clearHome') });
+    items.push({ label: tr('menu.sendSpot'), click: () => onCommand('goHome') });
+    items.push({ label: tr('menu.forgetSpot'), click: () => onCommand('clearHome') });
   }
   items.push({ type: 'separator' });
   items.push({
-    label: 'Focus mode',
+    label: tr('menu.focusMode'),
     type: 'checkbox',
     accelerator: 'Ctrl+Alt+F',
     checked: !!settings.focusMode,
@@ -231,65 +212,78 @@ function placeItems(settings, onCommand, onSetting) {
 // Sections both menus share, so the tray and the right-click menu can never
 // drift apart.
 function commonSections(o) {
-  const { settings, emotion, timers, shelf, onCommand, onSetting, onSettings,
+  const { settings, timers, shelf, onCommand, onSetting, onSettings,
     onTimer, onCancelTimer, onPomodoro, onShelf } = o;
   const held = shelf || [];
   return [
-    { label: 'Feeling', submenu: emotionMenu(settings, emotion, onCommand) },
-    { label: 'Shape', submenu: shapeMenu(settings, onSetting) },
-    { label: 'Colour', submenu: coatMenu(settings, onSetting, onSettings) },
-    { label: 'Size', submenu: sizeMenu(settings, onSetting) },
-    { label: 'Wearing', submenu: accessoryMenu(settings, onSetting) },
+    { label: tr('menu.shape'), submenu: shapeMenu(settings, onSetting) },
+    { label: tr('menu.colour'), submenu: coatMenu(settings, onSetting, onSettings) },
+    { label: tr('menu.size'), submenu: sizeMenu(settings, onSetting) },
+    { label: tr('menu.wearing'), submenu: accessoryMenu(settings, onSetting) },
     { type: 'separator' },
-    ...actionItems(settings, emotion, onCommand),
-    { type: 'separator' },
-    { label: 'Its spot', submenu: placeItems(settings, onCommand, onSetting) },
+    { label: tr('menu.spot'), submenu: placeItems(settings, onCommand, onSetting) },
     {
       label: (timers.timers || []).length
-        ? `Timers (${timers.timers.length} running)`
-        : 'Timers',
+        ? tr('menu.timersRunning', { n: timers.timers.length })
+        : tr('menu.timers'),
       submenu: timerMenu(timers, onTimer, onCancelTimer, onPomodoro),
     },
     ...(held.length
-      ? [{ label: `Holding ${held.length} file${held.length > 1 ? 's' : ''}`, submenu: shelfMenu(held, onShelf) }]
+      ? [{ label: tr(held.length > 1 ? 'menu.holdingPlural' : 'menu.holding', { n: held.length }),
+        submenu: shelfMenu(held, onShelf) }]
       : []),
     { type: 'separator' },
-    { label: 'Behaviour', submenu: behaviourMenu(settings, onSetting) },
-    { label: 'Settings…', click: onSettings },
+    { label: tr('menu.behaviour'), submenu: behaviourMenu(settings, onSetting) },
+    { label: tr('menu.settings'), click: onSettings },
   ];
 }
 
 const title = (settings, emotion) => {
-  const current = catalog.EMOTIONS[emotion];
   const name = settings.name || 'QU Bot';
-  return `${name} — ${current ? current.label.toLowerCase() : emotion}`;
+  const feeling = catalog.EMOTIONS[emotion] ? tr(`emotion.${emotion}`) : emotion;
+  return `${name} — ${feeling}`;
 };
 
 // The update section reflects whatever the updater is actually doing, including
 // telling you plainly when this build cannot update itself at all.
+// The updater reports state; the words for it live here, because only whoever
+// is drawing the menu knows which language to draw it in.
+function updateLabel(u) {
+  switch (u.status) {
+    case 'unsupported': return tr('update.unsupported', { reason: u.reason });
+    case 'checking': return tr('update.checking');
+    case 'available': return tr('update.available', { version: u.version });
+    case 'downloading': return tr('update.downloading', { percent: u.percent });
+    case 'ready': return tr('update.ready', { version: u.version });
+    case 'none': return tr('update.none');
+    case 'error': return tr('update.error', { reason: u.reason });
+    default: return tr('update.check');
+  }
+}
+
 function updateItems(update, onInstallUpdate, onCheckUpdate) {
   if (!update) return [];
   const items = [{ type: 'separator' }];
   switch (update.status) {
     case 'ready':
-      items.push({ label: update.label, click: onInstallUpdate });
+      items.push({ label: updateLabel(update), click: onInstallUpdate });
       break;
     case 'checking':
     case 'downloading':
     case 'unsupported':
-      items.push({ label: update.label, enabled: false });
+      items.push({ label: updateLabel(update), enabled: false });
       break;
     case 'available':
-      items.push({ label: update.label, enabled: false });
-      items.push({ label: 'Download it now', click: onCheckUpdate });
+      items.push({ label: updateLabel(update), enabled: false });
+      items.push({ label: tr('update.downloadNow'), click: onCheckUpdate });
       break;
     case 'none':
     case 'error':
-      items.push({ label: update.label, enabled: false });
-      items.push({ label: 'Check again', click: onCheckUpdate });
+      items.push({ label: updateLabel(update), enabled: false });
+      items.push({ label: tr('update.checkAgain'), click: onCheckUpdate });
       break;
     default:
-      items.push({ label: 'Check for updates', click: onCheckUpdate });
+      items.push({ label: tr('update.check'), click: onCheckUpdate });
   }
   return items;
 }
@@ -302,8 +296,8 @@ function buildContextMenu(o) {
     ...commonSections(o),
     ...updateItems(update, onInstallUpdate, onCheckUpdate),
     { type: 'separator' },
-    { label: 'Hide', accelerator: 'Ctrl+Alt+H', click: onHide },
-    { label: `Quit ${settings.name || 'QU Bot'}`, click: onQuit },
+    { label: tr('menu.hide'), accelerator: 'Ctrl+Alt+H', click: onHide },
+    { label: tr('menu.quit', { name: settings.name || 'QU Bot' }), click: onQuit },
   ]);
 }
 
@@ -313,14 +307,16 @@ function buildTrayMenu(o) {
   return Menu.buildFromTemplate([
     { label: title(settings, emotion), enabled: false },
     { type: 'separator' },
-    { label: hidden ? 'Show' : 'Hide', accelerator: 'Ctrl+Alt+H', click: () => onToggleVisible() },
-    { label: 'Summon to cursor', accelerator: 'Ctrl+Alt+B', enabled: !hidden, click: () => onCommand('__summon') },
+    { label: hidden ? tr('menu.show') : tr('menu.hide'), accelerator: 'Ctrl+Alt+H', click: () => onToggleVisible() },
+    { label: tr('menu.summon'), accelerator: 'Ctrl+Alt+B', enabled: !hidden, click: () => onCommand('__summon') },
     { type: 'separator' },
     ...commonSections(o),
     ...updateItems(update, onInstallUpdate, onCheckUpdate),
     { type: 'separator' },
-    { label: `Quit ${settings.name || 'QU Bot'}`, click: onQuit },
+    { label: tr('menu.quit', { name: settings.name || 'QU Bot' }), click: onQuit },
   ]);
 }
 
-module.exports = { loadCatalog, buildContextMenu, buildTrayMenu, SIZES, TOGGLES, QUICK_TIMERS };
+module.exports = {
+  loadCatalog, setMenuLanguage, buildContextMenu, buildTrayMenu, SIZES, TOGGLES, QUICK_TIMERS,
+};

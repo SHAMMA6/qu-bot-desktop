@@ -32,6 +32,7 @@ contextBridge.exposeInMainWorld('qubot', {
 
   // Main -> renderer
   onSettings: (cb) => on('settings', cb),
+  onLanguage: (cb) => on('language', cb),
   onLayout: (cb) => on('layout', cb),
   onCursor: (cb) => on('cursor', cb),
   onDisplays: (cb) => on('displays', cb),
