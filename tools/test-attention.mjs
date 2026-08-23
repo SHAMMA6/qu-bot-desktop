@@ -115,6 +115,8 @@ function testFollowsAcrossMonitors() {
 
 function testTypingBacksOff() {
   const a = new Attention();
+  a.rideWindows = false;   // perching beside the window, not riding it
+  
   a.noteApp({ process: 'code.exe', title: 'something', rect: { x: 100, y: 80, w: 1200, h: 800 } });
   const { seen } = run(a, {
     seconds: 8,
@@ -134,6 +136,7 @@ function testTypingBacksOff() {
 
 function testPerchesOnAMaximisedWindow() {
   const a = new Attention();
+  a.rideWindows = false;   // this test is about perching beside, not riding
   // A window filling the whole second monitor: there is no "outside" to sit in.
   a.noteApp({ process: 'code.exe', title: 'x', rect: { x: 1920, y: -90, w: 1707, h: 1020 } });
   run(a, {
@@ -241,6 +244,110 @@ function testDisabledStillBehaves() {
   results.push('  with cursor-following off it just roams, and still stays on screen');
 }
 
+
+// ---- riding a window ------------------------------------------------------
+function testRidesTheTitleBar() {
+  const a = new Attention();
+  const rect = { x: 300, y: 250, w: 1200, h: 700 };
+  a.noteApp({ process: 'code.exe', title: 'x', rect });
+  run(a, {
+    seconds: 8,
+    body: { x: 900, y: 500 },
+    cursor: () => ({ x: 600, y: 900 }),
+    idle: 0,
+  });
+  check(a.stance === STANCE.RIDE, `stance was ${a.stance}, expected to ride the window`);
+  // Sitting ON the top edge: above the window, not over its content.
+  check(a.target.y < rect.y + 10,
+    `rode at y=${a.target.y.toFixed(0)}, which is down inside the window, not on its bar`);
+  check(a.target.y > rect.y - RADIUS - 20,
+    `rode at y=${a.target.y.toFixed(0)}, floating well above the bar rather than on it`);
+  // ...and somewhere along that window's own width.
+  check(a.target.x > rect.x && a.target.x < rect.x + rect.w,
+    `rode at x=${a.target.x.toFixed(0)}, off the ends of the title bar`);
+  results.push('  sits on the title bar of the window you are working in');
+}
+
+function testRidingFollowsTheWindow() {
+  const a = new Attention();
+  a.noteApp({ process: 'code.exe', title: 'x', rect: { x: 300, y: 250, w: 1200, h: 700 } });
+  run(a, { seconds: 8, body: { x: 900, y: 500 }, cursor: () => ({ x: 600, y: 900 }), idle: 0 });
+  const before = a.target.x;
+
+  // The user drags the window 400px to the right.
+  a.noteApp({ process: 'code.exe', title: 'x', rect: { x: 700, y: 250, w: 1200, h: 700 } });
+  run(a, { seconds: 0.5, body: { x: a.target.x, y: a.target.y }, cursor: () => ({ x: 600, y: 900 }), idle: 0 });
+
+  check(a.target.x - before > 300,
+    `the window moved 400px but the target only moved ${(a.target.x - before).toFixed(0)}px`);
+  check(a.tracking, 'a window that just moved should be reported as being tracked');
+  results.push('  rides along when you drag that window');
+}
+
+function testRidingAMaximisedWindowClearsTheControls() {
+  const a = new Attention();
+  // Flush with the top of the screen: there is no "above" to sit on.
+  a.noteApp({ process: 'code.exe', title: 'x', rect: { x: 0, y: 0, w: 1920, h: 1032 } });
+  run(a, { seconds: 8, body: { x: 900, y: 500 }, cursor: () => ({ x: 900, y: 900 }), idle: 0 });
+  check(a.stance === STANCE.RIDE, `stance was ${a.stance}, expected ride`);
+  check(a.target.y >= RADIUS - 1,
+    `riding a maximised window put the body off the top of the screen at y=${a.target.y.toFixed(0)}`);
+  // The minimise / maximise / close cluster lives at the top RIGHT.
+  check(a.target.x < 1920 * 0.5,
+    `riding a maximised window sat at x=${a.target.x.toFixed(0)}, over the window controls`);
+  results.push('  tucks left on a maximised window, clear of the window controls');
+}
+
+// ---- the home spot --------------------------------------------------------
+function testWaitsOnItsSpotWhileTyping() {
+  const a = new Attention();
+  a.home = { x: 1700, y: 880 };
+  a.noteApp({ process: 'code.exe', title: 'x', rect: { x: 100, y: 100, w: 1200, h: 800 } });
+  run(a, {
+    seconds: 8,
+    body: { x: 900, y: 500 },
+    cursor: () => ({ x: 600, y: 300 }),
+    idle: 0,
+  });
+  check(a.stance === STANCE.HOME,
+    `stance was ${a.stance}, expected to wait on the chosen spot`);
+  check(Math.hypot(a.target.x - 1700, a.target.y - 880) < 40,
+    `waited at ${a.target.x.toFixed(0)},${a.target.y.toFixed(0)} rather than on its spot`);
+  results.push('  waits on the spot you picked while you are typing');
+}
+
+function testFocusModeStaysHomeEvenWhileMousing() {
+  const a = new Attention();
+  a.home = { x: 1700, y: 880 };
+  a.focusMode = true;
+  run(a, {
+    seconds: 6,
+    body: { x: 900, y: 500 },
+    // Cursor sweeping around: normally this would pull it to the shoulder.
+    cursor: (t) => ({ x: 300 + ((t * 800) % 1200), y: 400 }),
+  });
+  check(a.stance === STANCE.HOME,
+    `in focus mode the stance was ${a.stance}, expected to stay on its spot`);
+  results.push('  focus mode keeps it on its spot even while you use the mouse');
+}
+
+function testHomeStillNeverSitsOnTheCursor() {
+  const a = new Attention();
+  a.home = { x: 900, y: 500 };
+  geometryViolations = 0; offScreen = 0;
+  run(a, {
+    seconds: 10,
+    body: { x: 900, y: 500 },
+    // Cursor parked exactly on the home spot: the two rules are in direct conflict.
+    cursor: () => ({ x: 900, y: 500 }),
+    idle: 0,
+  });
+  check(geometryViolations === 0,
+    `the home spot sat on the cursor in ${geometryViolations} frames`);
+  check(offScreen === 0, `the home spot went off-screen in ${offScreen} frames`);
+  results.push('  a home spot under the cursor still yields, and stays on screen');
+}
+
 // ---------------------------------------------------------------- run
 console.log('attention');
 testAppClassification();
@@ -251,6 +358,12 @@ testFollowsAcrossMonitors();
 testTypingBacksOff();
 testTypingWithoutWindowInfo();
 testPerchesOnAMaximisedWindow();
+testRidesTheTitleBar();
+testRidingFollowsTheWindow();
+testRidingAMaximisedWindowClearsTheControls();
+testWaitsOnItsSpotWhileTyping();
+testFocusModeStaysHomeEvenWhileMousing();
+testHomeStillNeverSitsOnTheCursor();
 testDodgesSwipesNotReaches();
 testIdleGoesRoaming();
 testDisabledStillBehaves();

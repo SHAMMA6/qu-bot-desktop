@@ -9,8 +9,23 @@ on:
   workflow_dispatch:
 
 jobs:
-  windows:
-    runs-on: windows-latest
+  build:
+    strategy:
+      # One platform failing should not stop the others from producing builds.
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: windows
+            args: --win
+          - os: macos-latest
+            name: mac
+            args: --mac
+          - os: ubuntu-latest
+            name: linux
+            args: --linux
+
+    runs-on: ${{ matrix.os }}
     permissions:
       contents: write
 
@@ -28,16 +43,24 @@ jobs:
       - name: Run checks
         run: npm test
 
-      - name: Build installer + portable
-        run: npm run build -- --publish never
+      - name: Build
+        run: npx electron-builder ${{ matrix.args }} --publish never
+        env:
+          # There is no signing certificate in CI; without this, electron-builder
+          # tries to discover one on macOS and fails the build rather than
+          # producing an unsigned app.
+          CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: Upload build output
         uses: actions/upload-artifact@v4
         with:
-          name: qu-bot-windows
+          name: qu-bot-${{ matrix.name }}
           path: |
             dist/*.exe
             dist/*.blockmap
+            dist/*.dmg
+            dist/*.zip
+            dist/*.AppImage
           if-no-files-found: error
 
       - name: Attach to release
@@ -47,4 +70,7 @@ jobs:
           files: |
             dist/*.exe
             dist/*.blockmap
+            dist/*.dmg
+            dist/*.zip
+            dist/*.AppImage
           generate_release_notes: true

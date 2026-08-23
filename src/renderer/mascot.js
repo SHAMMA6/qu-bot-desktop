@@ -6,14 +6,16 @@
 // Physics works in absolute desktop coordinates; `origin` converts to window-local.
 
 import DATA from '../shared/mascot-data.js';
-import { Mark, SHAPE_KEYS } from './lib/mark.js';
+import { Mark, SHAPE_KEYS, seasonalAccessory } from './lib/mark.js';
 import { EMOTIONS, getEmotion } from './lib/emotions.js';
 import { Particles } from './lib/particles.js';
 import { Bubble } from './lib/bubble.js';
 import { Physics, MODE } from './lib/physics.js';
 import { Brain } from './lib/behavior.js';
 import { Attention, STANCE } from './lib/attention.js';
-import { say, LINES } from './lib/dialogue.js';
+import { Focus } from './lib/focus.js';
+import { Sound } from './lib/sound.js';
+import { say, LINES, setVoice } from './lib/dialogue.js';
 import { resolveCoat } from '../shared/themes.js';
 import { clamp, rand, pick, chance, approach, ease, lerpExpression, makeNoise, TAU } from './lib/geom.js';
 
@@ -100,37 +102,18 @@ const S = {
   savedAt: 0,
   local: { x: 0, y: 0 },
   fxOrigin: { cx: FX_HALF, cy: FX_HALF, r: 64 },
+
+  bondSaveIn: 30,        // seconds until the meters are written back
+  humming: false,
+  shelf: [],             // files the user has parked on it
+  machine: { battery: null, charging: true, online: true, cpu: 0 },
+  machineFlags: { low: false, critical: false, offline: false, busy: false },
 };
 
 const brain = new Brain(handleIntent);
 const attention = new Attention();
-
-// ---------------------------------------------------------------- audio
-let audioCtx = null;
-function blip(type) {
-  if (!S.settings?.soundEnabled) return;
-  try {
-    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-    const t = audioCtx.currentTime;
-    const spec = {
-      poke: { f: 620, to: 880, d: 0.09, v: 0.06, w: 'sine' },
-      pop: { f: 300, to: 160, d: 0.12, v: 0.07, w: 'triangle' },
-      boing: { f: 220, to: 90, d: 0.2, v: 0.08, w: 'sawtooth' },
-      happy: { f: 520, to: 1040, d: 0.16, v: 0.05, w: 'sine' },
-      type: { f: 1400, to: 1400, d: 0.012, v: 0.014, w: 'square' },
-    }[type] || { f: 440, to: 440, d: 0.08, v: 0.05, w: 'sine' };
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.type = spec.w;
-    osc.frequency.setValueAtTime(spec.f, t);
-    osc.frequency.exponentialRampToValueAtTime(Math.max(40, spec.to), t + spec.d);
-    gain.gain.setValueAtTime(spec.v, t);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t + spec.d);
-    osc.connect(gain).connect(audioCtx.destination);
-    osc.start(t);
-    osc.stop(t + spec.d + 0.02);
-  } catch { /* audio is a nicety, never a failure */ }
-}
+const focus = new Focus();
+const sound = new Sound();
 
 // ---------------------------------------------------------------- emotions
 function setEmotion(key, opts = {}) {
@@ -201,7 +184,11 @@ function travelToNeighbour(dir) {
 
 // ---------------------------------------------------------------- reactions
 function react(kind) {
-  brain.interacted();
+  // Every handled interaction is also a lifetime counter, which is what lets it
+  // say "you have thrown me 200 times" months later.
+  const COUNTER = { poke: 'pokes', pet: 'pets', tickle: 'tickles' };
+  if (COUNTER[kind]) brain.count(COUNTER[kind]); else brain.interacted();
+
   switch (kind) {
     case 'poke': {
       S.pokeStreak += 1;
@@ -211,7 +198,7 @@ function react(kind) {
       setEmotion(annoyed ? 'annoyed' : pick(['surprised', 'happy', 'curious', 'wink']));
       physics.nudge(rand(-70, 70), -190);
       impact(0.22);
-      blip('poke');
+      sound.poke();
       if (S.settings.chatter && chance(0.55)) speak(say(annoyed ? 'ignored' : 'poke'));
       annoyed ? brain.displeased(0.06) : brain.pleased(0.05);
       break;
@@ -221,13 +208,13 @@ function react(kind) {
       brain.pleased(0.09);
       if (chance(0.35)) fx.burst('heart', S.fxOrigin, 2);
       if (S.settings.chatter && chance(0.25)) speak(say('pet'));
-      blip('happy');
+      sound.emote('happy');
       break;
     case 'tickle':
       setEmotion('laughing');
       brain.pleased(0.14);
       if (S.settings.chatter && chance(0.6)) speak(say('tickle'));
-      blip('happy');
+      sound.emote('laughing');
       break;
     case 'talk':
       setEmotion(pick(['talking', 'happy', 'curious', 'thinking']));
@@ -250,6 +237,7 @@ function onActivity(info) {
   const change = attention.noteApp(info);
   if (!change || !S.settings?.watchActivity) return;
   S.activity = { kind: attention.app.kind, label: attention.app.label };
+  focus.noteApp(attention.app.kind, attention.app.label);
   // Switching between windows of the same app is a much smaller event than
   // switching apps entirely.
   if (change !== 'app') return;
@@ -295,6 +283,87 @@ function onAttentionEvent(ev) {
   }
 }
 
+// Patterns in how you are working, rather than which app is in front.
+function onFocusEvent(ev) {
+  if (!S.settings.chatter) return;
+  switch (ev.type) {
+    case 'focusLong':
+      if (!canReact(30)) return;
+      setEmotion(pick(['alert', 'curious', 'thinking']));
+      speak(say('focusLong', { mins: ev.minutes, app: ev.app }), { hold: 6 });
+      break;
+    case 'thrash':
+      if (!canReact(25)) return;
+      setEmotion('confused');
+      speak(say('thrash'), { hold: 5 });
+      break;
+    case 'lateNight':
+      if (!canReact(30)) return;
+      setEmotion(pick(['sleepy', 'skeptical']));
+      speak(say('lateNight'), { hold: 6 });
+      break;
+  }
+}
+
+// ---------------------------------------------------------------- the machine
+// Battery, network and load. Cheap signals that make it feel plugged into the
+// actual computer rather than floating on top of it.
+function onMachine(next = {}) {
+  Object.assign(S.machine, next);
+  if (!S.settings?.machineAware || brain.asleep) return;
+  const m = S.machine;
+  const f = S.machineFlags;
+
+  const pct = m.battery === null ? null : Math.round(m.battery * 100);
+  const critical = pct !== null && !m.charging && pct <= 7;
+  const low = pct !== null && !m.charging && pct <= 18;
+
+  if (critical && !f.critical) {
+    f.critical = true;
+    if (canReact(60)) { setEmotion('scared'); speak(say('batteryCritical', { pct }), { hold: 8 }); }
+  } else if (low && !f.low) {
+    f.low = true;
+    if (canReact(60)) { setEmotion('pleading'); speak(say('batteryLow', { pct }), { hold: 7 }); }
+  }
+  if (m.charging && (f.low || f.critical)) {
+    f.low = false; f.critical = false;
+    if (canReact(30)) { setEmotion('content'); speak(say('charging')); }
+  }
+
+  if (!m.online && !f.offline) {
+    f.offline = true;
+    if (canReact(30)) { setEmotion('confused'); speak(say('offline')); }
+  } else if (m.online && f.offline) {
+    f.offline = false;
+    if (canReact(20)) { setEmotion('happy'); speak(say('online')); }
+  }
+
+  // Sustained load, not a momentary spike.
+  const busy = m.cpu > 0.85;
+  if (busy && !f.busy) {
+    f.busy = true;
+    if (canReact(180)) { setEmotion(pick(['working', 'focused'])); speak(say('cpuHigh')); }
+  } else if (!busy && m.cpu < 0.6) {
+    f.busy = false;
+  }
+}
+
+function watchMachine() {
+  try {
+    if (navigator.getBattery) {
+      navigator.getBattery().then((b) => {
+        const push = () => onMachine({ battery: b.level, charging: b.charging });
+        b.addEventListener('levelchange', push);
+        b.addEventListener('chargingchange', push);
+        push();
+      }).catch(() => { /* no battery on this machine */ });
+    }
+  } catch { /* not supported */ }
+  window.addEventListener('online', () => onMachine({ online: true }));
+  window.addEventListener('offline', () => onMachine({ online: false }));
+  S.machine.online = navigator.onLine !== false;
+}
+
 // ---------------------------------------------------------------- hit testing
 const overBot = (lx, ly) => {
   const dx = lx - S.local.x;
@@ -332,7 +401,7 @@ botEl.addEventListener('pointerdown', (e) => {
   brain.interacted();
   setEmotion('held', { sticky: true });
   if (S.settings.chatter && chance(0.3)) speak(say('grab'));
-  blip('pop');
+  sound.pop();
 });
 
 function endDrag(e) {
@@ -357,6 +426,8 @@ function endDrag(e) {
     S.spinVel += Math.sign(physics.vx || 1) * clamp(speed / 90, 6, 40);
     if (S.settings.chatter && chance(0.5)) speak(say('throw'));
     brain.displeased(0.04);
+    brain.counters.throws += 1;
+    sound.whoosh(speed);
   }
   savePosition(true);
 }
@@ -366,7 +437,7 @@ botEl.addEventListener('pointercancel', endDrag);
 botEl.addEventListener('dblclick', (e) => { e.preventDefault(); react('talk'); });
 botEl.addEventListener('contextmenu', (e) => {
   e.preventDefault();
-  api.openMenu({ emotion: S.emotion });
+  api.openMenu({ emotion: S.emotion, shelf: S.shelf });
 });
 
 botEl.addEventListener('wheel', (e) => {
@@ -383,6 +454,48 @@ botEl.addEventListener('wheel', (e) => {
 }, { passive: false });
 
 bubbleEl.addEventListener('pointerdown', () => bubble.hide());
+
+// ---------------------------------------------------------------- the shelf
+// Files dropped on the body are held until you take them back — a pet-shaped
+// parking spot for the thing you are about to need. The overlay is normally
+// click-through, but hovering it already makes it interactive, so by the time a
+// dragged file is over the body the window is a real drop target.
+const SHELF_MAX = 6;
+
+const swallowDrag = (e) => { e.preventDefault(); e.stopPropagation(); };
+stage.addEventListener('dragenter', swallowDrag);
+stage.addEventListener('dragover', (e) => {
+  swallowDrag(e);
+  e.dataTransfer.dropEffect = 'copy';
+  if (!S.sticky) setEmotion('curious');
+});
+
+stage.addEventListener('drop', (e) => {
+  swallowDrag(e);
+  // `File.path` was removed in Electron 32; the real path now comes from
+  // webUtils, which only the preload can reach.
+  const paths = [...(e.dataTransfer?.files || [])]
+    .map((f) => api.pathForFile?.(f))
+    .filter(Boolean);
+  if (!paths.length) return;
+
+  const room = SHELF_MAX - S.shelf.length;
+  if (room <= 0) {
+    setEmotion('annoyed');
+    speak(say('shelfFull'));
+    return;
+  }
+  const taken = paths.slice(0, room);
+  S.shelf = [...S.shelf, ...taken];
+  api.setShelf?.(S.shelf);
+  brain.interacted();
+  brain.pleased(0.05);
+  setEmotion('held');
+  impact(0.3);
+  sound.pop();
+  const base = taken[0].split(/[\\/]/).pop();
+  speak(say('shelfTake', { name2: base }));
+});
 
 // ---------------------------------------------------------------- cursor feed
 function onCursor(pt) {
@@ -458,14 +571,29 @@ function applySettings(next) {
 
   physics.radius = next.size * 0.5;
   physics.gravityEnabled = !!next.gravity;
+  // Grab feel. Squared so the slider spends most of its travel in the range
+  // people can actually feel — past a point, stiffer is just "glued to cursor".
+  const grab = clamp(next.grabResponse ?? 0.8, 0, 1);
+  physics.holdStiffness = 120 + grab * grab * 12000;
+
   attention.enabled = !!next.followCursor;
   attention.watchApps = !!next.watchActivity;
+  attention.rideWindows = !!next.rideWindows;
+  attention.home = next.home || null;
+  attention.homeWhenBusy = !!next.homeWhenBusy;
+  attention.focusMode = !!next.focusMode;
   document.body.classList.toggle('is-flying', !next.gravity);
 
   brain.enabled.roam = !!next.roam;
   brain.enabled.chatter = !!next.chatter;
   brain.enabled.sleep = !!next.sleepWhenIdle;
   brain.enabled.nudges = !!next.nudges;
+  brain.quiet = !!next.focusMode;
+  brain.setPersonality({ chatty: next.chatty, clingy: next.clingy, sassy: next.sassy });
+
+  setVoice({ name: next.name, sassy: next.sassy });
+  sound.set({ enabled: next.soundEnabled, volume: next.volume });
+  mark.setAccessory(next.seasonal ? seasonalAccessory() : null);
 
   if (!prev || !next.chatter) return;
   if (prev.shape !== next.shape && chance(0.6)) { setEmotion('curious'); speak(say('shapeChange')); }
@@ -533,7 +661,7 @@ function frame(now) {
     if (ev.type === 'land') {
       impact(clamp(ev.speed / 900, 0.1, 0.7));
       fx.burst('dust', S.fxOrigin, ev.speed > 700 ? 10 : 5);
-      blip('pop');
+      sound.land(ev.speed);
       if (ev.speed > 950 && !S.dragging) {
         setEmotion(ev.speed > 1700 ? 'dizzy' : 'squished');
         if (S.settings.chatter && chance(0.4)) speak(say('drop'));
@@ -541,7 +669,7 @@ function frame(now) {
     } else if (ev.type === 'bounce') {
       impact(clamp(ev.speed / 1200, 0.08, 0.45));
       S.spinVel += (ev.surface === 'left' ? 1 : -1) * clamp(ev.speed / 140, 2, 16);
-      blip('boing');
+      sound.bounce(ev.speed);
       if (ev.speed > 700 && S.settings.chatter && chance(0.3)) speak(say('bounce'));
     } else if (ev.type === 'settle') {
       if (S.emotion === 'falling' || S.emotion === 'held') { S.sticky = false; setEmotion('idle'); }
@@ -581,9 +709,38 @@ function frame(now) {
     held: S.dragging,
   })) onAttentionEvent(ev);
 
+  // Chasing a window the user is dragging needs a far tighter loop than drifting
+  // to a spot that will still be there in a second. Eased rather than switched,
+  // so letting go of a window does not snap the body to a halt.
+  physics.trackTight = approach(physics.trackTight, attention.tracking ? 1 : 0, 6, dt);
+
+  // ---- how long you have actually been at this
+  for (const ev of focus.update(dt, {
+    chatty: S.settings.focusReports && !S.settings.focusMode && !brain.asleep,
+  })) onFocusEvent(ev);
+
+  // Write the meters back periodically. A crash should cost minutes of a
+  // relationship, not the whole thing.
+  S.bondSaveIn -= dt;
+  if (S.bondSaveIn <= 0) {
+    S.bondSaveIn = 30;
+    api.saveBond?.(brain.status);
+  }
+
+  // A continuous breathing tone while asleep, started and stopped rather than
+  // retriggered so it is genuinely continuous.
+  const shouldHum = brain.asleep && !!S.settings.soundEnabled;
+  if (shouldHum !== S.humming) {
+    S.humming = shouldHum;
+    if (shouldHum) sound.startHum(); else sound.stopHum();
+  }
+
   // Hand the flight system its target. Only while actually flying under its own
   // power — a throw, a drag or a nap all take precedence.
-  const mayMove = S.settings.followCursor || S.settings.roam;
+  // A home spot is reason enough to move even with following and roaming both
+  // off — otherwise "park here while I work" would silently do nothing.
+  const mayMove = S.settings.followCursor || S.settings.roam
+    || (S.settings.home && (S.settings.homeWhenBusy || S.settings.focusMode));
   if (mayMove && !S.dragging && !brain.asleep
       && physics.mode === MODE.FLOATING && !physics.gravityEnabled) {
     physics.hoverTo(attention.target.x, attention.target.y);
@@ -785,6 +942,70 @@ const COMMANDS = {
     S.sticky = false;
   },
   hint: (p) => showHint(p.text),
+
+  // The user picked a parking spot: wherever the body is standing right now.
+  setHome: () => {
+    const home = { x: Math.round(physics.x), y: Math.round(physics.y) };
+    api.updateSettings({ home, homeWhenBusy: true });
+    setEmotion('proud');
+    fx.burst('sparkle', S.fxOrigin, 8);
+    speak(say('homeSet'));
+    showHint('home set');
+  },
+  clearHome: () => {
+    api.updateSettings({ home: null });
+    setEmotion('curious');
+    speak(say('homeCleared'));
+  },
+  goHome: () => {
+    if (!S.settings.home) return;
+    physics.hoverTo(S.settings.home.x, S.settings.home.y);
+    setEmotion('working');
+  },
+  focusToggle: (p) => {
+    setEmotion(p.on ? 'focused' : 'happy');
+    speak(say(p.on ? 'focusOn' : 'focusOff'));
+  },
+
+  // "How long have I been at this?"
+  report: () => {
+    const r = focus.report();
+    setEmotion('thinking');
+    if (!r.kind || r.minutes < 1) {
+      speak(say('focusShort', { mins: Math.max(1, r.minutes) }), { hold: 6 });
+      return;
+    }
+    speak(say('focusReport', { mins: r.minutes, app: r.app }), { hold: 7 });
+  },
+
+  // A timer, alarm or pomodoro phase came due.
+  timer: (p) => {
+    const urgent = p.kind === 'timer';
+    sound.chime(urgent);
+    if (p.kind === 'pomodoro-break') {
+      setEmotion('celebrating');
+      fx.burst('confetti', S.fxOrigin, 24);
+      speak(say('pomodoroBreak', { mins: p.minutes }), { hold: 10 });
+    } else if (p.kind === 'pomodoro-work') {
+      setEmotion('focused');
+      speak(say('pomodoroWork', { mins: p.minutes }), { hold: 8 });
+    } else {
+      setEmotion('alert');
+      physics.hop(0.8);
+      speak(say('timerDone', { label: p.label }), { hold: 12 });
+    }
+  },
+  timerSet: (p) => {
+    setEmotion('working');
+    speak(say('timerSet', { mins: p.minutes }));
+  },
+
+  shelf: (p) => { S.shelf = Array.isArray(p.files) ? p.files : []; },
+
+  menuOpen: () => {
+    if (S.settings.chatter && chance(0.35)) speak(say('menuOpen'), { hold: 3 });
+  },
+
   reclamp: () => {
     physics.settleOnScreen();
     S.hostId = physics.hostFor().id;
@@ -800,20 +1021,24 @@ api.onDisplays((list) => { physics.setDisplays(list); S.hostId = null; });
 api.onIdle((seconds) => {
   S.idleSeconds = seconds;
   attention.noteIdle(seconds);
+  focus.noteIdle(seconds);
   brain.setUserAway(seconds > 60);
 });
 api.onActivity((info) => onActivity(info));
 api.onCommand((cmd, payload) => COMMANDS[cmd]?.(payload || {}));
 api.onPlace((p) => { physics.place(p.x, p.y); physics.stop(); });
+api.onMachine?.((info) => onMachine(info));
 
 watchPixelRatio();
+watchMachine();
 
-bubble.onType = () => { if (chance(0.28)) blip('type'); };
+bubble.onType = () => { if (chance(0.28)) sound.type(); };
 
 // Debug hook: lets a dev capture pose the character deterministically. Exposes
 // only this page's own state — nothing privileged crosses the preload boundary.
 window.__qubot = {
-  state: S, physics, brain, attention, fx, bubble, mark, setEmotion, speak,
+  state: S, physics, brain, attention, focus, sound, fx, bubble, mark,
+  setEmotion, speak, commands: COMMANDS,
   pose({ x, y, emotion, shape, text, burst, count, coat, ink }) {
     // Freeze the autonomous parts so a capture is deterministic.
     brain.suppressed = true;
@@ -833,6 +1058,10 @@ window.__qubot = {
 
 api.ready().then((boot) => {
   layout(boot.window);
+  // Seed the meters BEFORE settings, so personality is applied to a brain that
+  // already remembers how it feels about you.
+  brain.loadBond(boot.bond);
+  S.shelf = Array.isArray(boot.shelf) ? boot.shelf : [];
   applySettings(boot.settings);
   physics.setDisplays(boot.displays);
   physics.place(boot.position.x, boot.position.y);
@@ -842,6 +1071,9 @@ api.ready().then((boot) => {
   S.hostId = physics.hostFor().id;
   if (S.hostId !== boot.hostId) api.setDisplay(S.hostId);
   setEmotion('idle', { force: true });
-  if (boot.settings.greetOnLaunch) S.queued.push({ t: 0.9, fn: () => brain.greet() });
+  if (boot.settings.greetOnLaunch) {
+    const awayDays = Math.floor((boot.bond?.awayHours || 0) / 24);
+    S.queued.push({ t: 0.9, fn: () => brain.greet({ awayDays }) });
+  }
   requestAnimationFrame(frame);
 });

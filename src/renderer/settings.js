@@ -95,6 +95,12 @@ function buildCoats() {
 const TOGGLES = [
   ['followCursor', 'Watch what you do', 'Floats near your cursor and the window you are working in'],
   ['watchActivity', 'Notice the app in front', 'Reacts when you switch apps, and perches beside that window. Read locally only, never stored or sent anywhere'],
+  ['rideWindows', 'Sit on the window you are using', 'Perches on the title bar and rides along when you move the window'],
+  ['homeWhenBusy', 'Wait on its spot while you work', 'Goes to the spot you picked instead of hovering near the cursor'],
+  ['focusReports', 'Mention long stretches', 'Notices when you have been in one app for a long time'],
+  ['machineAware', 'React to the machine', 'Notices low battery, the network dropping and heavy load'],
+  ['seasonal', 'Seasonal hats', 'A hat in December, shades in July'],
+  ['autoUpdate', 'Automatic updates', 'Downloads new versions in the background'],
   ['roam', 'Wander around', 'Drifts around the screen on its own when you are idle'],
   ['gravity', 'Gravity', 'Off, it flies. On, it falls and sits on the ground like a desk pet'],
   ['chatter', 'Speech bubbles', 'Occasional remarks and reactions'],
@@ -114,8 +120,11 @@ function buildToggles() {
       <input type="checkbox" data-key="${key}" />
     </label>`).join('');
 
-  $('toggles').addEventListener('change', (e) => {
-    const input = e.target.closest('[data-key]');
+  // Bound on the document rather than on the container: some switches (focus
+  // mode) live in their own panel, and render() already updates every
+  // [data-key] on the page regardless of where it sits.
+  document.addEventListener('change', (e) => {
+    const input = e.target.closest('input[type=checkbox][data-key]');
     if (input) api.update({ [input.dataset.key]: input.checked });
   });
 }
@@ -159,11 +168,123 @@ function buildTabs() {
 }
 
 function buildActions() {
-  document.querySelector('.actions').addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-cmd]');
-    if (btn) api.command(btn.dataset.cmd);
+  // There is more than one action row now, so bind them all rather than the
+  // first one the document happens to contain.
+  document.querySelectorAll('.actions').forEach((row) => {
+    row.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-cmd]');
+      if (btn) api.command(btn.dataset.cmd);
+    });
   });
   $('resetAll').addEventListener('click', () => api.reset());
+}
+
+// ---------------------------------------------------------------- timers
+const QUICK = [5, 10, 15, 25, 45, 60];
+
+const mmss = (seconds) => {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+};
+
+let timerState = { pomodoro: null, timers: [] };
+
+function renderTimers(next) {
+  if (next) timerState = next;
+  const list = $('timerList');
+  if (!timerState.timers.length) {
+    list.innerHTML = '<li class="empty">Nothing running.</li>';
+  } else {
+    list.innerHTML = timerState.timers.map((t) => `
+      <li>
+        <span class="timers__label">${escapeText(t.label)}</span>
+        <span class="timers__left">${mmss(t.remaining)}</span>
+        <button class="link" data-cancel="${t.id}">cancel</button>
+      </li>`).join('');
+  }
+  $('pomodoroToggle').textContent = timerState.pomodoro
+    ? `Stop (${timerState.pomodoro})` : 'Start';
+}
+
+// Timer labels are user-entered, so they go in as text rather than as markup.
+const escapeText = (s) => {
+  const d = document.createElement('div');
+  d.textContent = String(s ?? '');
+  return d.innerHTML;
+};
+
+function buildTimers() {
+  $('quickTimers').innerHTML = QUICK.map((m) =>
+    `<button data-quick="${m}">${m} min</button>`).join('');
+
+  $('quickTimers').addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-quick]');
+    if (btn) renderTimers(await api.addTimer(Number(btn.dataset.quick), `${btn.dataset.quick} minute timer`));
+  });
+
+  $('addTimer').addEventListener('click', async () => {
+    const mins = Number($('timerMinutes').value);
+    if (!mins || mins < 1) return;
+    const label = $('timerLabel').value.trim() || `${mins} minute timer`;
+    renderTimers(await api.addTimer(mins, label));
+    $('timerMinutes').value = '';
+    $('timerLabel').value = '';
+  });
+
+  $('timerList').addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-cancel]');
+    if (btn) renderTimers(await api.cancelTimer(btn.dataset.cancel));
+  });
+
+  $('pomodoroToggle').addEventListener('click', async () => {
+    renderTimers(await api.pomodoro());
+  });
+
+  for (const key of ['pomodoroWork', 'pomodoroBreak']) {
+    $(key).addEventListener('change', (e) => {
+      const v = Number(e.target.value);
+      if (v > 0) api.update({ [key]: v });
+    });
+  }
+
+  // The remaining times are only meaningful if they actually tick.
+  setInterval(async () => {
+    if (!document.querySelector('[data-panel="focus"].is-active')) return;
+    renderTimers(await api.timers());
+  }, 1000);
+}
+
+// ---------------------------------------------------------------- bond
+function renderBond(b) {
+  if (!b) return;
+  const hours = Math.floor(b.seconds / 3600);
+  const since = b.firstMet ? new Date(b.firstMet).toLocaleDateString() : '—';
+  const rows = [
+    ['Known each other', `${b.daysKnown} day${b.daysKnown === 1 ? '' : 's'}`],
+    ['First met', since],
+    ['Days seen', b.days],
+    ['Times opened', b.sessions],
+    ['Time together', hours >= 1 ? `${hours} hour${hours === 1 ? '' : 's'}` : '< 1 hour'],
+    ['Pokes', b.pokes],
+    ['Pets', b.pets],
+    ['Tickles', b.tickles],
+    ['Throws', b.throws],
+    ['Fondness', `${Math.round(b.affection * 100)}%`],
+    ['Mood', `${Math.round(b.mood * 100)}%`],
+    ['Bond level', `${b.level} of 4`],
+  ];
+  $('bondStats').innerHTML = rows
+    .map(([k, v]) => `<dt>${k}</dt><dd>${escapeText(v)}</dd>`).join('');
+}
+
+function buildBond() {
+  $('forgetBond').addEventListener('click', async () => {
+    renderBond(await api.forgetBond());
+  });
+  document.querySelector('.tabs').addEventListener('click', async (e) => {
+    if (e.target.closest('[data-tab="bond"]')) renderBond(await api.bond());
+  });
 }
 
 // ---------------------------------------------------------------- sync
@@ -185,7 +306,40 @@ function render(next) {
   $('sizeOut').textContent = `${next.size}px`;
   $('opacity').value = Math.round(next.opacity * 100);
   $('opacityOut').textContent = `${Math.round(next.opacity * 100)}%`;
+
+  // Do not fight the user mid-word: every keystroke round-trips through the
+  // store and comes back here, which would reset the caret to the end.
+  if (document.activeElement !== $('botName')) $('botName').value = next.name || '';
+  $('heroName').textContent = next.name || 'QU Bot';
+
+  for (const key of PERCENT_SLIDERS) {
+    const pct = Math.round((next[key] ?? 0) * 100);
+    if (document.activeElement !== $(key)) $(key).value = pct;
+    $(`${key}Out`).textContent = `${pct}%`;
+  }
+
+  for (const key of ['pomodoroWork', 'pomodoroBreak']) {
+    if (document.activeElement !== $(key)) $(key).value = next[key];
+  }
+
+  $('homeState').textContent = next.home
+    ? `Waiting at ${next.home.x}, ${next.home.y} while you work.`
+    : 'No spot set — it drifts around your cursor instead.';
 }
+
+const PERCENT_SLIDERS = ['chatty', 'clingy', 'sassy', 'grabResponse', 'volume'];
+
+for (const key of PERCENT_SLIDERS) {
+  $(key).addEventListener('input', (e) => {
+    const pct = Number(e.target.value);
+    $(`${key}Out`).textContent = `${pct}%`;
+    api.update({ [key]: pct / 100 });
+  });
+}
+
+$('botName').addEventListener('input', (e) => {
+  api.update({ name: e.target.value });
+});
 
 $('size').addEventListener('input', (e) => {
   $('sizeOut').textContent = `${e.target.value}px`;
@@ -208,9 +362,13 @@ buildCoats();
 buildToggles();
 buildEmotions();
 buildActions();
+buildTimers();
+buildBond();
 
 api.onSettings(render);
 api.get().then((s) => {
   render(s);
   requestAnimationFrame(previewLoop);
 });
+api.timers().then(renderTimers);
+api.bond().then(renderBond);

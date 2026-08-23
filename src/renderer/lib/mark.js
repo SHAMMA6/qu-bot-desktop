@@ -20,6 +20,58 @@ const el = (name, attrs) => {
 
 let clipSeq = 0;
 
+// Seasonal accessories. Everything is authored in the shared viewBox, which only
+// allows 15 units of headroom above the crown — so hats rest ON the head and
+// lean off to one side rather than towering over it, which is the only way they
+// fit without changing the viewBox for every shape.
+export const ACCESSORIES = {
+  santa: () => `
+    <path d="M58 34 C78 -2 150 -14 186 -6 L172 44 C140 34 92 38 62 50 Z" fill="#c0392b"/>
+    <rect x="46" y="30" width="130" height="24" rx="12" fill="#f7f7f7"/>
+    <circle cx="190" cy="-6" r="14" fill="#f7f7f7"/>`,
+  witch: () => `
+    <path d="M96 38 C104 4 118 -12 132 -14 L166 40 C140 46 116 46 96 38 Z" fill="#2f2b3d"/>
+    <ellipse cx="120" cy="44" rx="80" ry="16" fill="#2f2b3d"/>
+    <rect x="92" y="26" width="60" height="12" rx="6" fill="#8f7ae6"
+          transform="rotate(-9 122 32)"/>`,
+  party: () => `
+    <path d="M108 40 L140 -12 L172 44 Z" fill="#f2a03d"/>
+    <path d="M120 22 L146 14 L152 26 L126 34 Z" fill="#e4576a"/>
+    <circle cx="140" cy="-14" r="10" fill="#5ec9a8"/>`,
+  // Shades sit on the eye line, so they take the per-shape face fit the eyes do.
+  shades: (face) => {
+    const fit = (x, y) => [
+      HEAD_C + face.x + (x - HEAD_C) * face.sx,
+      HEAD_C + face.y + (y - HEAD_C) * face.sy,
+    ];
+    const [lx, ly] = fit(98, 110);
+    const [rx, ry] = fit(160, 116);
+    const w = 54 * face.eye;
+    const h = 36 * face.eye;
+    return `
+      <rect x="${(lx - w / 2).toFixed(1)}" y="${(ly - h / 2).toFixed(1)}"
+            width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="${(h * 0.34).toFixed(1)}"
+            fill="#1c1c22"/>
+      <rect x="${(rx - w / 2).toFixed(1)}" y="${(ry - h / 2).toFixed(1)}"
+            width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="${(h * 0.34).toFixed(1)}"
+            fill="#1c1c22"/>
+      <rect x="${(lx + w / 2 - 2).toFixed(1)}" y="${((ly + ry) / 2 - 4).toFixed(1)}"
+            width="${Math.max(2, rx - lx - w + 4).toFixed(1)}" height="7" rx="3" fill="#1c1c22"/>`;
+  },
+};
+
+// What, if anything, it should be wearing today. Deliberately narrow windows so
+// an accessory stays a small surprise rather than the bot's permanent look.
+export function seasonalAccessory(date = new Date()) {
+  const m = date.getMonth();
+  const d = date.getDate();
+  if (m === 0 && d <= 2) return 'party';
+  if (m === 11 || (m === 0 && d <= 5)) return 'santa';
+  if (m === 9 && d >= 24) return 'witch';
+  if (m === 6 || m === 7) return 'shades';
+  return null;
+}
+
 export class Mark {
   constructor(container) {
     this.shapeKey = 'blob';
@@ -63,6 +115,12 @@ export class Mark {
 
     this.body.appendChild(this.face);
 
+    // Seasonal accessory, above the face so a hat is not clipped to the
+    // silhouette but below the star so a celebration still reads.
+    this.acc = el('g', { class: 'mark__acc' });
+    this.accKey = null;
+    this.body.appendChild(this.acc);
+
     // A single gold star, borrowed straight from the reference mark, used as a
     // "pinned / favourite" badge and for celebration beats.
     this.star = el('path', { class: 'mark__star', d: DATA.STAR_PATH, opacity: '0' });
@@ -92,11 +150,25 @@ export class Mark {
       this.blushL.setAttribute('cy', y);
       this.blushR.setAttribute('cy', y);
     }
+    // Shades are fitted to the face, which just changed under them.
+    if (this.accKey) {
+      const key = this.accKey;
+      this.accKey = null;
+      this.setAccessory(key);
+    }
   }
 
   setColors({ coat, ink }) {
     this.head.style.fill = coat;
     this.eyes.forEach((e) => (e.style.fill = ink));
+  }
+
+  // `key` is an ACCESSORIES name, or null for none.
+  setAccessory(key) {
+    const next = key && ACCESSORIES[key] ? key : null;
+    if (next === this.accKey) return;
+    this.accKey = next;
+    this.acc.innerHTML = next ? ACCESSORIES[next](this.shape.face) : '';
   }
 
   // `state` is rebuilt every frame by the mascot loop.

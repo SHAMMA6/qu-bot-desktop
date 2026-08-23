@@ -1,14 +1,19 @@
 // The mascot's autonomy. It keeps a few slow-moving meters and, when nothing
 // else is going on, picks something to do. Everything it decides is emitted as an
 // intent; the renderer decides how to perform it.
+//
+// The meters are seeded from — and periodically written back to — the persisted
+// bond record, so affection built up over weeks survives a restart. That single
+// fact is what separates a companion from a screensaver, and it is why `status`
+// exists rather than being a debugging convenience.
 
 import { rand, pick, clamp, chance } from './geom.js';
-import { say, greeting } from './dialogue.js';
+import { say, greeting, bondLine } from './dialogue.js';
 
 const MINUTE = 60;
 
 export class Brain {
-  constructor(emit) {
+  constructor(emit, opts = {}) {
     this.emit = emit;
 
     // Slow meters, all 0..1.
@@ -16,6 +21,15 @@ export class Brain {
     this.mood = 0.65;       // nudged by how it is treated
     this.boredom = 0;       // rises when ignored
     this.affection = 0.3;   // rises with petting, decays slowly
+
+    // Personality, all 0..1. These scale the weights below rather than adding
+    // new branches, so a quiet bot and a needy one run the same code.
+    this.persona = { chatty: 0.5, clingy: 0.5, sassy: 0.5 };
+
+    // Lifetime counters, mirrored back to the store.
+    this.counters = { pokes: 0, pets: 0, tickles: 0, throws: 0 };
+    this.bond = { level: 0, daysKnown: 1, seconds: 0, interactions: 0 };
+    this.sinceBondLine = 0;
 
     this.sinceInteraction = 0;
     this.sinceAction = 0;
@@ -30,6 +44,49 @@ export class Brain {
 
     this.enabled = { roam: true, chatter: true, sleep: true, nudges: true };
     this.suppressed = false;   // true while the user is actively handling it
+    this.quiet = false;        // focus mode: still alive, just not performing
+
+    if (opts.bond) this.loadBond(opts.bond);
+  }
+
+  // Seed from the persisted record.
+  loadBond(b) {
+    if (!b) return;
+    for (const k of ['energy', 'mood', 'boredom', 'affection']) {
+      if (Number.isFinite(b[k])) this[k] = clamp(b[k], 0, 1);
+    }
+    for (const k of ['pokes', 'pets', 'tickles', 'throws']) {
+      if (Number.isFinite(b[k])) this.counters[k] = b[k];
+    }
+    this.bond = {
+      level: b.level ?? 0,
+      daysKnown: b.daysKnown ?? 1,
+      seconds: b.seconds ?? 0,
+      interactions: b.interactions ?? 0,
+    };
+  }
+
+  setPersonality(p = {}) {
+    for (const k of ['chatty', 'clingy', 'sassy']) {
+      if (Number.isFinite(p[k])) this.persona[k] = clamp(p[k], 0, 1);
+    }
+  }
+
+  // What gets written back to disk.
+  get status() {
+    return {
+      energy: this.energy, mood: this.mood, boredom: this.boredom,
+      affection: this.affection, asleep: this.asleep, userAway: this.userAway,
+      ...this.counters,
+    };
+  }
+
+  count(key, weight = 1) {
+    if (key in this.counters) {
+      this.counters[key] += 1;
+      this.bond.interactions += 1;
+    }
+    this.interacted(weight);
   }
 
   interacted(weight = 1) {
@@ -58,7 +115,14 @@ export class Brain {
     this.asleep = false;
     this.energy = clamp(this.energy + 0.45, 0, 1);
     this.emit({ type: 'emotion', key: 'surprised' });
-    if (withLine && this.enabled.chatter) this.emit({ type: 'say', text: say('wake'), delay: 0.35 });
+    if (withLine && this.mayChatter()) this.emit({ type: 'say', text: say('wake'), delay: 0.35 });
+  }
+
+  // Chatter is gated by the setting, focus mode, and how talkative this
+  // particular bot is.
+  mayChatter(base = 1) {
+    if (!this.enabled.chatter || this.quiet) return false;
+    return chance(clamp(base * (0.25 + this.persona.chatty * 1.5), 0, 1));
   }
 
   setUserAway(away) {
@@ -72,20 +136,28 @@ export class Brain {
       if (this.asleep) this.wake(false);
       if (gone > 4 * MINUTE) {
         this.emit({ type: 'emotion', key: gone > 25 * MINUTE ? 'excited' : 'happy' });
-        if (this.enabled.chatter) this.emit({ type: 'say', text: say('returned'), delay: 0.4 });
+        if (this.mayChatter()) this.emit({ type: 'say', text: say('returned'), delay: 0.4 });
       }
     }
   }
 
-  greet() {
+  greet(extra) {
     this.emit({ type: 'emotion', key: 'happy' });
-    if (this.enabled.chatter) this.emit({ type: 'say', text: greeting(), delay: 0.5 });
+    if (!this.enabled.chatter) return;
+    // A long absence or a milestone outranks the ordinary time-of-day hello.
+    if (extra && extra.awayDays >= 2) {
+      this.emit({ type: 'say', text: say('longAway', { days: extra.awayDays }), delay: 0.5 });
+      return;
+    }
+    this.emit({ type: 'say', text: greeting(), delay: 0.5 });
   }
 
   update(dt, ctx) {
     this.sessionSeconds += dt;
     this.sinceInteraction += dt;
     this.sinceAction += dt;
+    this.sinceBondLine += dt;
+    this.bond.seconds += dt;
     if (this.userAway) this.awaySeconds += dt;
 
     // Meters.
@@ -96,6 +168,9 @@ export class Brain {
     if (!this.asleep && this.sinceInteraction > 20) this.boredom = clamp(this.boredom + 0.012 * dt, 0, 1);
 
     if (this.suppressed || ctx.busy) { this.sinceAction = 0; return; }
+
+    // Focus mode: the meters keep running, but it stops competing for attention.
+    if (this.quiet) return;
 
     // Hourly chime.
     const hour = new Date().getHours();
@@ -126,7 +201,7 @@ export class Brain {
       if (tired || abandoned) {
         if (ctx.emotionKey !== 'sleepy') {
           this.emit({ type: 'emotion', key: 'sleepy', sticky: true });
-          if (this.enabled.chatter && tired) this.emit({ type: 'say', text: say('sleepy') });
+          if (tired && this.mayChatter()) this.emit({ type: 'say', text: say('sleepy') });
           this.sinceAction = 0;
         } else if (this.sinceAction > 6) {
           this.sleep();
@@ -140,7 +215,9 @@ export class Brain {
 
     if (this.sinceAction < this.nextActionIn) return;
     this.sinceAction = 0;
-    this.nextActionIn = rand(7, 20) * (1 - this.boredom * 0.4);
+    // A quiet bot simply does things less often.
+    const pace = 1.7 - this.persona.chatty;
+    this.nextActionIn = rand(7, 20) * pace * (1 - this.boredom * 0.4);
 
     this.act(ctx);
   }
@@ -149,19 +226,38 @@ export class Brain {
   act(ctx) {
     const opts = [];
     const w = (weight, fn) => { if (weight > 0) opts.push({ weight, fn }); };
+    const { chatty, clingy } = this.persona;
+    const talks = this.enabled.chatter ? 0.3 + chatty * 1.9 : 0;
+
+    // A rare line that only exists once you have known each other a while.
+    // Gated hard on time so it stays a surprise rather than a catchphrase.
+    if (this.bond.level >= 1 && this.sinceBondLine > 25 * MINUTE && this.enabled.chatter) {
+      w(1.1 + this.bond.level * 0.5, () => {
+        this.sinceBondLine = 0;
+        const text = bondLine(this.bond.level, {
+          days: this.bond.daysKnown,
+          hours: Math.round(this.bond.seconds / 3600),
+          pokes: this.counters.pokes,
+          throws: this.counters.throws,
+        });
+        if (!text) return;
+        this.emit({ type: 'emotion', key: pick(['content', 'happy', 'thinking']) });
+        this.emit({ type: 'say', text, delay: 0.3 });
+      });
+    }
 
     w(3, () => this.emit({ type: 'emotion', key: pick(['lookLeft', 'lookRight', 'lookUp', 'lookDown']) }));
     w(2, () => this.emit({ type: 'emotion', key: 'curious' }));
     w(1.4 + this.boredom * 3, () => {
       this.emit({ type: 'emotion', key: 'bored' });
-      if (this.enabled.chatter && chance(0.6)) this.emit({ type: 'say', text: say('bored'), delay: 0.5 });
+      if (this.mayChatter(0.6)) this.emit({ type: 'say', text: say('bored'), delay: 0.5 });
     });
-    w(this.enabled.chatter ? 2.2 : 0, () => {
+    w(talks * 1.1, () => {
       this.emit({ type: 'emotion', key: pick(['neutral', 'thinking', 'content']) });
       this.emit({ type: 'say', text: say('idleMusing'), delay: 0.3 });
     });
     w(this.mood * 2.4, () => this.emit({ type: 'emotion', key: pick(['happy', 'content', 'wink']) }));
-    w(this.affection * 2, () => {
+    w(this.affection * 2 * (0.5 + clingy), () => {
       this.emit({ type: 'emotion', key: 'love' });
     });
     w((1 - this.mood) * 1.6, () => this.emit({ type: 'emotion', key: pick(['annoyed', 'sad', 'skeptical']) }));
@@ -169,16 +265,20 @@ export class Brain {
     // already moving the body around, so the brain contributes flourishes
     // instead of navigation.
     const grounded = ctx.canMove && !ctx.flying;
-    w(this.enabled.roam && grounded ? 2.6 : 0, () => this.emit({ type: 'walk', duration: rand(2.5, 6) }));
+    // An independent bot wanders further and more often; a clingy one stays put
+    // near whatever you are doing.
+    const wander = 1.6 - clingy;
+    w(this.enabled.roam && grounded ? 2.6 * wander : 0, () => this.emit({ type: 'walk', duration: rand(2.5, 6) }));
     w(this.enabled.roam && grounded ? 1.8 : 0, () => this.emit({ type: 'hop', power: rand(0.55, 1) }));
     w(ctx.flying ? 1.5 : 0, () => this.emit({ type: 'flourish' }));
-    w(ctx.flying && ctx.stance === 'shoulder' ? 1.2 : 0, () => {
+    w(ctx.flying && ctx.stance === 'shoulder' ? 1.2 * (0.5 + clingy) : 0, () => {
       this.emit({ type: 'emotion', key: pick(['listening', 'curious', 'content']) });
-      if (this.enabled.chatter && chance(0.4)) this.emit({ type: 'say', text: say('watching'), delay: 0.3 });
+      if (this.mayChatter(0.4)) this.emit({ type: 'say', text: say('watching'), delay: 0.3 });
     });
     // Visiting the other monitor is rare on purpose — it is a big move, and the
     // user should not have to hunt for where the mascot went.
-    w(this.enabled.roam && ctx.canMove && ctx.screens > 1 ? 0.7 : 0, () => this.emit({ type: 'travel' }));
+    w(this.enabled.roam && ctx.canMove && ctx.screens > 1 ? 0.7 * wander : 0,
+      () => this.emit({ type: 'travel' }));
     w(1.2, () => this.emit({ type: 'emotion', key: 'peek' }));
     w(this.energy < 0.35 ? 2.5 : 0, () => this.emit({ type: 'emotion', key: 'sleepy' }));
 
@@ -186,12 +286,5 @@ export class Brain {
     let r = Math.random() * total;
     for (const o of opts) { r -= o.weight; if (r <= 0) return o.fn(); }
     opts[0]?.fn();
-  }
-
-  get status() {
-    return {
-      energy: this.energy, mood: this.mood, boredom: this.boredom,
-      affection: this.affection, asleep: this.asleep, userAway: this.userAway,
-    };
   }
 }

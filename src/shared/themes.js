@@ -49,27 +49,3 @@ export function resolveCoat(key, custom) {
   const found = COATS.find((c) => c.key === key) || COATS[0];
   return { coat: found.coat, ink: inkFor(found.coat) };
 }
-
-export const DEFAULTS = {
-  coat: 'chalk',
-  customCoat: '#885CF5',
-  shape: 'blob',
-  size: 128,
-  opacity: 1,
-  gravity: false,
-  roam: true,
-  followCursor: true,
-  watchActivity: true,
-  chatter: true,
-  sleepWhenIdle: true,
-  nudges: true,
-  gazeFollowsCursor: true,
-  clickThrough: true,
-  alwaysOnTop: true,
-  soundEnabled: false,
-  launchOnLogin: false,
-  position: null,          // {x, y} of the mascot centre, or null for "bottom right"
-  display: null,           // remembered display id
-  greetOnLaunch: true,
-  doubleClickAction: 'talk',
-};

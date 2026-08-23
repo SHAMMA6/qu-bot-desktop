@@ -251,10 +251,212 @@ export const LINES = {
     'ooh.',
   ],
   menuOpen: ['what do you need?', 'options.', 'go ahead.'],
+// ---- long stretches in one app -----------------------------------------
+  focusLong: [
+    '{mins} minutes in {app}. just so you know.',
+    'you have been in {app} for {mins} minutes straight.',
+    '{mins} minutes on this. still going?',
+    'that is {mins} minutes without looking up.',
+  ],
+  focusReport: [
+    '{mins} minutes in {app} so far.',
+    'you have had {app} up for {mins} minutes.',
+    '{mins} minutes. i have been counting.',
+  ],
+  focusShort: [
+    'about {mins} minutes here.',
+    '{mins} minutes, give or take.',
+  ],
+  thrash: [
+    'you have flipped between those twice now. stuck?',
+    'back and forth. back and forth.',
+    'whatever you are looking for, it is not in either of those.',
+  ],
+  lateNight: [
+    'it is past two. i am not your mother, but.',
+    'the sensible hours ended a while ago.',
+    'still up. ok. i am up too, then.',
+  ],
+  longAway: [
+    'you were gone {days} days. i counted.',
+    '{days} days. the desktop got very quiet.',
+    'oh good, you came back.',
+  ],
+
+  // ---- the relationship ----------------------------------------------------
+  bond1: [
+    'we are getting used to each other.',
+    'you are around a lot. i like that.',
+  ],
+  bond2: [
+    'day {days}. not that i am counting. i am counting.',
+    'we have done {days} days of this.',
+    'you have poked me {pokes} times, by the way.',
+  ],
+  bond3: [
+    'day {days}. this is the longest job i have ever had.',
+    '{hours} hours together. i checked.',
+    'i would notice if you stopped opening me.',
+  ],
+  bond4: [
+    'day {days}. i live here now.',
+    '{hours} hours. you are stuck with me.',
+    'i have been thrown {throws} times and i keep coming back. think about that.',
+  ],
+  anniversary: [
+    'it has been a year. of this. of us.',
+    'one year today. no card, i notice.',
+  ],
+  milestone: [
+    'that is {count} pokes. a milestone, arguably.',
+    '{count}. i keep count of these things.',
+  ],
+
+  // ---- timers and pomodoro -------------------------------------------------
+  timerDone: [
+    'that is your {label}.',
+    '{label}. time.',
+    'timer up: {label}.',
+  ],
+  timerSet: [
+    '{mins} minutes. i will shout.',
+    'noted. {mins} minutes.',
+    'counting down from {mins}.',
+  ],
+  pomodoroWork: [
+    'right. {mins} minutes of actual work.',
+    'go. i will keep quiet.',
+    'clock is running. {mins} minutes.',
+  ],
+  pomodoroBreak: [
+    'stop. {mins} minute break.',
+    'that is a block done. get up.',
+    'break. {mins} minutes. properly.',
+  ],
+
+  // ---- the machine ---------------------------------------------------------
+  batteryLow: [
+    'battery is at {pct}%. just saying.',
+    '{pct}% left. i am not going to nag. much.',
+    'you have {pct}% of a computer left.',
+  ],
+  batteryCritical: [
+    '{pct}%. plug something in.',
+    'we are about to lose this argument with physics.',
+  ],
+  charging: [
+    'ah. power.',
+    'good. i was getting worried.',
+  ],
+  offline: [
+    'the network went away.',
+    'no internet. it is very quiet out there.',
+  ],
+  online: [
+    'we are back online.',
+    'the internet returned.',
+  ],
+  cpuHigh: [
+    'something is really working the processor.',
+    'the fans have opinions about whatever that is.',
+    'this machine is busy. i can feel it.',
+  ],
+
+  // ---- the shelf -----------------------------------------------------------
+  shelfTake: [
+    'got it. i will hold this.',
+    'fine. i am a shelf now.',
+    'holding {name2}.',
+  ],
+  shelfFull: [
+    'my arms are full. metaphorically.',
+    'that is enough. i only have so much... whatever this is.',
+  ],
+  shelfGive: [
+    'here. take it back.',
+    'delivered.',
+  ],
+
+  // ---- home and focus ------------------------------------------------------
+  homeSet: [
+    'right. this is my spot now.',
+    'noted. i will wait here.',
+    'my corner. i like it.',
+  ],
+  homeCleared: [
+    'free again.',
+    'no spot. back to drifting.',
+  ],
+  focusOn: [
+    'quiet mode. go do the thing.',
+    'i will be over here, not bothering you.',
+    'go on. i will wait.',
+  ],
+  focusOff: [
+    'and we are back.',
+    'done? good.',
+  ],
+
   hidden: ['i will be in the tray.', 'call me back anytime.'],
 };
 
-export const say = (key) => pick(LINES[key] || LINES.idleMusing);
+// Voice: the user's chosen name plus their personality sliders. Sassiness picks
+// a spikier variant of a line where one exists, so two people's bots read
+// differently without needing two whole scripts.
+const VOICE = { name: 'QU Bot', sassy: 0.5 };
+
+export function setVoice(next = {}) {
+  if (typeof next.name === 'string' && next.name.trim()) VOICE.name = next.name.trim();
+  if (Number.isFinite(next.sassy)) VOICE.sassy = Math.max(0, Math.min(1, next.sassy));
+}
+
+// Spikier alternatives, used more often the higher the sassy slider is.
+export const SASSY = {
+  poke: [
+    'do that again and see what happens.',
+    'i am not a button.',
+    'wow. bold.',
+    'incredible. groundbreaking.',
+  ],
+  pet: [
+    'yes. obviously. continue.',
+    'i allow this.',
+  ],
+  breakNudge: [
+    'get up. you are becoming furniture.',
+    'stand. stretch. i will wait.',
+  ],
+  bored: [
+    'i could be doing anything else. i am not, but i could.',
+    'riveting.',
+  ],
+  typing: [
+    'lot of typing. some of it is probably right.',
+    'go off i guess.',
+  ],
+};
+
+const fill = (line, vars) => {
+  let out = String(line).split('{name}').join(VOICE.name);
+  if (vars) {
+    for (const k of Object.keys(vars)) out = out.split('{' + k + '}').join(String(vars[k]));
+  }
+  return out;
+};
+
+export const say = (key, vars) => {
+  const spicy = SASSY[key];
+  const pool = (spicy && Math.random() < VOICE.sassy * 0.75)
+    ? spicy
+    : (LINES[key] || LINES.idleMusing);
+  return fill(pick(pool), vars);
+};
+
+// The bond line for a level, if that level has anything new to say.
+export const bondLine = (level, vars) => {
+  const pool = LINES['bond' + level];
+  return pool ? fill(pick(pool), vars) : null;
+};
 
 export function greeting(date = new Date()) {
   const h = date.getHours();

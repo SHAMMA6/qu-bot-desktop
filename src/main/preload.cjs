@@ -1,7 +1,7 @@
 // Narrow bridge between the mascot window and the main process. The renderer gets
 // exactly these calls and nothing else — no node, no remote module.
 
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 const on = (channel, cb) => {
   ipcRenderer.on(channel, (_e, ...args) => cb(...args));
@@ -19,6 +19,16 @@ contextBridge.exposeInMainWorld('qubot', {
   emotionChanged: (key) => ipcRenderer.send('bot:emotion', key),
   // Called only when the body crosses onto a different monitor.
   setDisplay: (id) => ipcRenderer.send('bot:display', id),
+  // The four slow meters and the lifetime counters, written back periodically.
+  saveBond: (status) => ipcRenderer.send('bond:save', status),
+  setShelf: (paths) => ipcRenderer.send('shelf:set', paths),
+
+  // Dropped files. Electron removed `File.path` in v32, so the only way to get a
+  // real path out of a DataTransfer is webUtils — which is not reachable from an
+  // isolated renderer, hence this shim.
+  pathForFile: (file) => {
+    try { return webUtils.getPathForFile(file); } catch { return ''; }
+  },
 
   // Main -> renderer
   onSettings: (cb) => on('settings', cb),
@@ -29,4 +39,5 @@ contextBridge.exposeInMainWorld('qubot', {
   onActivity: (cb) => on('activity', cb),
   onCommand: (cb) => on('command', cb),
   onPlace: (cb) => on('place', cb),
+  onMachine: (cb) => on('machine', cb),
 });

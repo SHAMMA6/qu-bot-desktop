@@ -41,6 +41,10 @@ try { [void][QuFg]::SetProcessDpiAwarenessContext([IntPtr](-4)) } catch {}
 
 $names = @{}
 $last = ''
+# Adaptive cadence. Riding a window the user is dragging needs samples fast
+# enough to look attached; an untouched desktop needs almost none. So poll
+# quickly for a couple of seconds after anything changes, then back off.
+$quiet = 999
 while ($true) {
   # Never outlive the app. A normal quit kills this process directly, but if
   # QU Bot is force-terminated nothing would clean it up, and an orphaned polling
@@ -67,13 +71,16 @@ while ($true) {
       $key = "$procId|$title|$($r.Left),$($r.Top),$($r.Right),$($r.Bottom)"
       if ($key -ne $last) {
         $last = $key
+        $quiet = 0
         $o = [ordered]@{ p = $names[$procId]; t = $title; r = @($r.Left, $r.Top, $r.Right, $r.Bottom) }
         [Console]::Out.WriteLine(($o | ConvertTo-Json -Compress))
         [Console]::Out.Flush()
+      } else {
+        $quiet++
       }
     }
   } catch {}
-  Start-Sleep -Milliseconds 700
+  if ($quiet -lt 30) { Start-Sleep -Milliseconds 70 } else { Start-Sleep -Milliseconds 400 }
 }
 `;
 

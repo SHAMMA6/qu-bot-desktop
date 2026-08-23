@@ -11,7 +11,7 @@
   <header class="hero">
     <div class="hero__preview"><div id="preview"></div></div>
     <div class="hero__meta">
-      <h1>QU Bot</h1>
+      <h1 id="heroName">QU Bot</h1>
       <p id="heroSub">A small desktop colleague.</p>
     </div>
   </header>
@@ -20,12 +20,20 @@
     <button class="tab is-active" data-tab="look" role="tab">Look</button>
     <button class="tab" data-tab="feel" role="tab">Feelings</button>
     <button class="tab" data-tab="behave" role="tab">Behaviour</button>
+    <button class="tab" data-tab="focus" role="tab">Focus</button>
+    <button class="tab" data-tab="bond" role="tab">Bond</button>
     <button class="tab" data-tab="keys" role="tab">Controls</button>
   </nav>
 
   <main>
     <!-- ---------------------------------------------------- LOOK -->
     <section class="panel is-active" data-panel="look">
+      <h2>Name</h2>
+      <label class="row">
+        <span>What to call it</span>
+        <input type="text" id="botName" maxlength="24" spellcheck="false" />
+      </label>
+
       <h2>Body</h2>
       <div class="grid" id="shapeGrid"></div>
 
@@ -57,6 +65,39 @@
 
     <!-- ---------------------------------------------------- BEHAVIOUR -->
     <section class="panel" data-panel="behave">
+      <h2>Personality</h2>
+      <p class="note">Two bots with different settings genuinely behave differently.</p>
+      <label class="row row--slider">
+        <span class="slider__label">Quiet · Chatty</span>
+        <input type="range" id="chatty" min="0" max="100" step="5" />
+        <output id="chattyOut"></output>
+      </label>
+      <label class="row row--slider">
+        <span class="slider__label">Independent · Clingy</span>
+        <input type="range" id="clingy" min="0" max="100" step="5" />
+        <output id="clingyOut"></output>
+      </label>
+      <label class="row row--slider">
+        <span class="slider__label">Sweet · Sassy</span>
+        <input type="range" id="sassy" min="0" max="100" step="5" />
+        <output id="sassyOut"></output>
+      </label>
+
+      <h2>Feel</h2>
+      <label class="row row--slider">
+        <span class="slider__label">Grab weight</span>
+        <input type="range" id="grabResponse" min="0" max="100" step="5" />
+        <output id="grabResponseOut"></output>
+      </label>
+      <p class="note">How tightly it follows your cursor when you pick it up.
+        Higher is snappier; lower feels heavier.</p>
+      <label class="row row--slider">
+        <span class="slider__label">Volume</span>
+        <input type="range" id="volume" min="0" max="100" step="5" />
+        <output id="volumeOut"></output>
+      </label>
+
+      <h2>Behaviour</h2>
       <div id="toggles"></div>
       <h2>Actions</h2>
       <div class="actions">
@@ -69,6 +110,62 @@
       </div>
       <h2>Reset</h2>
       <button class="danger" id="resetAll">Restore all defaults</button>
+    </section>
+
+    <!-- ---------------------------------------------------- FOCUS -->
+    <section class="panel" data-panel="focus">
+      <h2>Its spot</h2>
+      <p class="note" id="homeState">No spot set.</p>
+      <div class="actions">
+        <button data-cmd="setHome">Park it where it is</button>
+        <button data-cmd="goHome">Send it there</button>
+        <button data-cmd="clearHome">Forget the spot</button>
+      </div>
+      <p class="note">While you are typing it waits on this spot instead of
+        drifting around your cursor.</p>
+
+      <h2>Focus mode</h2>
+      <label class="toggle">
+        <span class="toggle__text">
+          <strong>Focus mode</strong>
+          <span>Goes to its spot, stops talking and stops performing. Ctrl + Alt + F</span>
+        </span>
+        <input type="checkbox" data-key="focusMode" />
+      </label>
+
+      <h2>Timers</h2>
+      <div class="actions" id="quickTimers"></div>
+      <div class="row row--inline">
+        <input type="number" id="timerMinutes" min="1" max="1440" step="1" placeholder="minutes" />
+        <input type="text" id="timerLabel" maxlength="40" placeholder="what for (optional)" />
+        <button id="addTimer">Set</button>
+      </div>
+      <ul class="timers" id="timerList"></ul>
+
+      <h2>Pomodoro</h2>
+      <div class="row row--inline">
+        <label class="mini">Work
+          <input type="number" id="pomodoroWork" min="5" max="120" step="1" />
+        </label>
+        <label class="mini">Break
+          <input type="number" id="pomodoroBreak" min="1" max="60" step="1" />
+        </label>
+        <button id="pomodoroToggle">Start</button>
+      </div>
+      <p class="note">It goes heads-down during a work block and celebrates when
+        the break starts.</p>
+    </section>
+
+    <!-- ---------------------------------------------------- BOND -->
+    <section class="panel" data-panel="bond">
+      <h2>What it remembers</h2>
+      <dl class="keys" id="bondStats"></dl>
+      <p class="note">These carry across restarts. Its mood and how fond it is of
+        you are built from them, and some things it says only unlock after you
+        have known each other a while.</p>
+      <h2>Start over</h2>
+      <button class="danger" id="forgetBond">Forget everything about me</button>
+      <p class="note">Restoring defaults elsewhere deliberately leaves this alone.</p>
     </section>
 
     <!-- ---------------------------------------------------- CONTROLS -->
@@ -89,6 +186,12 @@
         <dt>Ctrl + Alt + B</dt><dd>Summon to cursor</dd>
         <dt>Ctrl + Alt + H</dt><dd>Hide / show</dd>
         <dt>Ctrl + Alt + C</dt><dd>Celebrate</dd>
+        <dt>Ctrl + Alt + F</dt><dd>Focus mode on / off</dd>
+        <dt>Ctrl + Alt + L</dt><dd>How long have I been at this?</dd>
+      </dl>
+      <h2>Other</h2>
+      <dl class="keys">
+        <dt>Drop a file on it</dt><dd>It holds onto it until you take it back</dd>
       </dl>
       <p class="note">It also greets you by time of day, dozes off when you step away,
         and welcomes you back when you return.</p>

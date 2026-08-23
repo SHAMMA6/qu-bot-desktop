@@ -5,9 +5,15 @@ eyes, no mouth, no outline.
 
 It **floats** above your desktop and pays attention to what you are doing. It
 drifts near whatever you are pointing at, keeps clear of your cursor, gets out of
-the way when you swipe at it, backs off and perches beside your window while you
-type, follows you when you move to your other monitor, and reacts when you switch
-apps. Poke it, tickle it, pet it, or grab it out of the air and throw it.
+the way when you swipe at it, **sits on the title bar of the window you are
+working in and rides along when you move it**, follows you to your other monitor,
+and reacts when you switch apps. Poke it, tickle it, pet it, or grab it out of
+the air and throw it.
+
+It also **remembers you** between launches — how fond of you it is, how many days
+you have known each other, how many times you have thrown it — and it will
+wait on a spot you choose while you work, count how long you have been heads-down
+in one app, and hold your timers.
 
 ![QU Bot](assets/icon.png)
 
@@ -24,6 +30,10 @@ apps. Poke it, tickle it, pet it, or grab it out of the air and throw it.
 | `QU-Bot-<version>-portable.exe` | One file, no install. Double-click it and the bot appears |
 
 Nothing else is needed — Node and Electron are bundled inside.
+
+**macOS and Linux** builds (`.dmg`, `.AppImage`) are produced by the same CI run
+and attached to each release. Everything works there except *Notice the app in
+front*, which relies on a Windows-only helper and simply stays off.
 
 The builds are not code-signed, so the first launch shows SmartScreen's
 *"Windows protected your PC"*. Click **More info → Run anyway**. Silencing that
@@ -79,6 +89,86 @@ a wide cloud alike.
 **11 coats** plus any custom colour. The eye colour is derived from the coat's
 luminance, so a custom colour never produces unreadable eyes.
 
+## It remembers you
+
+Four slow meters — energy, mood, boredom and affection — plus a set of lifetime
+counters are written to disk and read back on every launch. The mascot that
+greets you tomorrow is the one you had today, with the same opinion of you.
+
+| It tracks | Which shows up as |
+| --- | --- |
+| Days known, days seen, times opened | `day 41.` — and it means it |
+| Time together | Lines that only exist after tens of hours |
+| Pokes, pets, tickles, throws | `i have been thrown 200 times and i keep coming back.` |
+| Affection, mood | Whether it greets you warmly or tolerates you |
+
+Those add up to a **bond level**, 0 to 4, deliberately slow — level 4 is weeks of
+real use. Each level unlocks lines the level below never says, and they are rate
+limited to at most one every 25 minutes so they stay a surprise rather than a
+catchphrase. The whole record is visible under **Settings → Bond**, and
+*Restore all defaults* deliberately leaves it alone; there is a separate,
+explicit button to make it forget you.
+
+## Working alongside you
+
+**Give it a spot.** Right-click → *Its spot* → **Park it here**, and that is
+where it waits whenever you are typing, instead of drifting around your cursor.
+
+**Focus mode** (`Ctrl` + `Alt` + `F`) sends it to that spot and makes it stop
+performing entirely — no chatter, no wandering, no idle flourishes. The meters
+keep running underneath; it is just being polite.
+
+**It sits on your window.** While you type it perches on the title bar of the
+window you are working in and rides along when you drag it. On a maximised
+window there is no "above" to sit on, so it tucks inside the bar on the left,
+clear of the minimise/maximise/close cluster. Turn it off with *Sit on the window
+you are using*.
+
+**It counts the time you are actually working.** Not wall-clock time — the
+clock only advances while the OS reports recent input, so leaving the editor open
+while you make coffee does not count. Ask it any time with `Ctrl` + `Alt` + `L`,
+and it will volunteer at the 30, 60, 90, 120, 180 and 240 minute marks. It also
+notices you bouncing between the same two windows six times in ninety seconds,
+and that it is three in the morning.
+
+**Timers, alarms and pomodoro.** Set them from the tray, the right-click menu or
+**Settings → Focus**. They persist across restarts — a 45-minute timer survives a
+reboot — and an alarm that is overdue by more than five minutes is dropped rather
+than fired at you hours late. The pomodoro alternates work and break blocks, and
+it performs them: heads-down and quiet during work, confetti when the break
+starts.
+
+**Drop a file on it** and it holds onto it. The right-click menu grows a
+*Holding n files* section to open them, show them in the folder, or let go. It
+holds six at most, and remembers them across restarts.
+
+## Making it yours
+
+**Name it.** Settings → Look. It uses the name in menus and speech.
+
+**Three personality sliders** scale the weights the brain already uses, so two
+people's bots genuinely behave differently rather than picking from a
+preset list:
+
+| Slider | What actually changes |
+| --- | --- |
+| Quiet ↔ Chatty | How often it acts at all, and how much of that is speech |
+| Independent ↔ Clingy | Whether it wanders off or stays near what you are doing |
+| Sweet ↔ Sassy | Picks a spikier variant of a line where one exists |
+
+**Grab weight** decides how tightly it follows your cursor when you pick it up.
+See [How it feels in the hand](#how-it-feels-in-the-hand).
+
+**Sound** is synthesised at runtime — there are no audio files in the build.
+Each emotion group has its own timbre, a landing thumps lower and dirtier the
+harder it lands, a throw whistles, and it breathes while it sleeps.
+
+**Seasonal hats** — a santa hat in December, shades in July, a witch hat at
+Halloween, a party hat on New Year. Off in one click.
+
+**It notices the machine**: battery getting low, the charger going in, the
+network dropping, and sustained heavy CPU load.
+
 ## Interactions
 
 On the mascot:
@@ -92,6 +182,7 @@ On the mascot:
 | Hover and stroke | Pet it — repeat and it grows fond of you |
 | Swipe fast at it | It dodges — approach slowly to catch it |
 | Right-click | Full menu: feelings, shape, colour, size, behaviour |
+| Drop a file on it | It holds onto it until you take it back |
 | Scroll | Resize |
 | Shift + scroll | Cycle body shape |
 
@@ -102,6 +193,8 @@ Anywhere:
 | `Ctrl` + `Alt` + `B` | Summon it to your cursor |
 | `Ctrl` + `Alt` + `H` | Hide / show |
 | `Ctrl` + `Alt` + `C` | Celebrate |
+| `Ctrl` + `Alt` + `F` | Focus mode on / off |
+| `Ctrl` + `Alt` + `L` | How long have I been at this? |
 
 It also greets you by time of day, notices when you have been gone a while,
 marks the hour, occasionally suggests you take a break, and gets bored if
@@ -165,10 +258,12 @@ above the taskbar.
 ```
 src/
   main/                  Electron main process (CommonJS)
-    main.cjs             Overlay window, cursor + idle feeds, tray, shortcuts
+    main.cjs             Overlay window, cursor + idle feeds, tray, shortcuts,
+                         CPU sampling, auto-update
     menus.cjs            Tray and right-click menus
     awareness.cjs        Foreground-window watcher (opt-out, local only)
-    store.cjs            Debounced JSON settings in userData
+    timers.cjs           Timers, alarms and the pomodoro cycle
+    store.cjs            Debounced JSON settings + the bond record, in userData
     preload.cjs          The mascot window's IPC bridge
     preload-settings.cjs The settings window's IPC bridge
   renderer/              (ES modules)
@@ -179,6 +274,8 @@ src/
       emotions.js        The 42-emotion table
       behavior.js        Autonomy: meters and action selection
       attention.js       Where it wants to be, and what it noticed you doing
+      focus.js           Active time per app, and the patterns worth mentioning
+      sound.js           Every noise it makes, synthesised at runtime
       physics.js         Flight, drag, throw, gravity, bounce, multi-display
       particles.js       17 canvas effect emitters
       bubble.js          Speech bubbles
@@ -192,7 +289,8 @@ tools/
   make-sheet.cjs         Contact sheets of expressions / shapes / emotions
   validate.mjs           Character-data integrity checks
   test-displays.mjs      Multi-monitor + flight physics simulation
-  test-attention.mjs     Attention rules: clearance, dodging, perching
+  test-attention.mjs     Attention rules: clearance, dodging, perching, riding
+  test-companion.mjs     Grab feel, the work clock, timers and pomodoro
 ```
 
 ### The window
@@ -246,6 +344,30 @@ stacked, three-monitor, and single — because these are the cases you cannot
 check without physically owning the hardware. The attention rules are simulated
 the same way.
 
+### How it feels in the hand
+
+Picking it up used to feel heavy — not weighty, *laggy*. The held body was on a
+soft spring (stiffness 26, damping applied once per frame), and a spring tracking
+a moving target settles a constant distance behind it, proportional to
+`2 * zeta / sqrt(k)`. At that stiffness the body sat most of a body-width behind
+the cursor for the whole drag.
+
+Weight belongs in the squash, the stretch and the tumble. It must never go in the
+*position* of the thing the user is directly holding, because that is the one
+part they are controlling. So the spring is now very stiff, and the slider runs
+from noticeably floaty to effectively glued.
+
+Two things fall out of that. A stiff spring integrated in one frame-sized step
+diverges, so the held integration is substepped at 1/480s — the frame clamp is
+0.1s, and that has to stay stable. And damping is applied per *second* rather
+than per frame, because the old per-frame multiplier meant a 144Hz screen damped
+nearly twice as hard as a 60Hz one, so the same setting felt different on
+different monitors. `npm test` checks the lag at 30, 60 and 144Hz and asserts
+they agree.
+
+Throw velocity is sampled from cursor history rather than from the body, so none
+of this changes how hard a flick throws.
+
 ### How expressions work
 
 Each expression is two closed rings of 48 points. Because every expression has an
@@ -269,7 +391,7 @@ alive. The loop drops to 30fps while the mascot is asleep or you are away.
 ## Development
 
 ```bash
-npm test                                     # data checks + multi-monitor sim
+npm test                                     # data, monitors, attention, companion
 npm run dev                                  # with devtools
 node tools/make-icons.cjs                    # regenerate app + tray icons
 node tools/make-sheet.cjs expressions        # contact sheet -> .ref/

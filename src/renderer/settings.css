@@ -250,3 +250,72 @@ button:not(.tab):not(.chip):not(.emotion):hover { background: var(--hover); }
 
 .keys dt { font-weight: 550; color: var(--fg); white-space: nowrap; }
 .keys dd { color: var(--muted); }
+
+/* ---------------------------------------------------------- inline rows */
+.row--inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.row--inline input[type=number] { width: 92px; }
+.row--inline input[type=text] { flex: 1; min-width: 120px; }
+
+input[type=text], input[type=number] {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--fg);
+  border-radius: 9px;
+  padding: 8px 10px;
+  font: inherit;
+}
+
+input[type=text]:focus, input[type=number]:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* The slider label has to hold its width, or the tracks jump around as the
+   readouts change length. */
+.slider__label { min-width: 148px; color: var(--muted); flex: none; }
+
+.mini {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+}
+
+.mini input { width: 72px; }
+
+/* ---------------------------------------------------------- timer list */
+.timers { list-style: none; margin: 10px 0 0; padding: 0; }
+
+.timers li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  margin-bottom: 6px;
+}
+
+.timers__label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.timers__left { font-variant-numeric: tabular-nums; color: var(--muted); }
+.timers .empty { color: var(--muted); justify-content: center; }
+
+.link {
+  border: none !important;
+  background: none !important;
+  color: var(--muted) !important;
+  padding: 2px 4px !important;
+  font-size: 12px !important;
+  cursor: pointer;
+}
+
+.link:hover { color: #e0484d !important; }

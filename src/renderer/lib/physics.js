@@ -48,11 +48,22 @@ export class Physics {
     this.steer = 3.4;             // how hard it corrects course
     this.arriveWithin = 14;       // considered "there" inside this radius
     this.arrived = true;
+    // 0..1: how hard powered flight should chase a target that is itself
+    // moving. Drifting to a spot that will still be there in a second wants a
+    // loose, weighty loop; riding the title bar of a window the user is
+    // dragging wants a tight one, or the body is left behind.
+    this.trackTight = 0;
 
-    // Held-state spring, so being dragged has weight instead of snapping.
+    // Held-state spring. Very stiff on purpose. A soft spring here does not read
+    // as weight, it reads as lag: while the cursor moves, a spring tracking a
+    // ramp settles a constant distance behind it, proportional to 2*zeta/sqrt(k).
+    // At the old stiffness of 26 that was most of a body-width at ordinary drag
+    // speeds, which is exactly the "heavy", unresponsive feeling. Weight belongs
+    // in the squash, stretch and tumble — never in the position of the thing the
+    // user is directly holding. `grabResponse` (0..1) maps onto this.
     this.holdTarget = { x: 0, y: 0 };
-    this.holdStiffness = 26;
-    this.holdDamping = 0.82;
+    this.holdStiffness = 7400;
+    this.holdDampingRatio = 0.92;
 
     // Recent cursor samples, used to compute throw velocity on release.
     this.dragSamples = [];
@@ -233,13 +244,24 @@ export class Physics {
     const events = [];
 
     if (this.mode === MODE.HELD) {
-      // Critically-ish damped spring toward the cursor.
-      const ax = (this.holdTarget.x - this.x) * this.holdStiffness;
-      const ay = (this.holdTarget.y - this.y) * this.holdStiffness;
-      this.vx = (this.vx + ax * dt) * this.holdDamping;
-      this.vy = (this.vy + ay * dt) * this.holdDamping;
-      this.x += this.vx * dt;
-      this.y += this.vy * dt;
+      // Damped spring toward the cursor, substepped. A stiff spring integrated
+      // in one frame-sized step goes unstable as soon as the frame rate dips,
+      // and multiplying velocity by a constant per frame (the obvious version)
+      // makes the feel depend on the refresh rate — a 144Hz screen would damp
+      // nearly twice as hard as a 60Hz one.
+      const k = this.holdStiffness;
+      const c = 2 * Math.sqrt(k) * this.holdDampingRatio;
+      let left = dt;
+      while (left > 1e-6) {
+        // Substep size is set by the stiffest spring the slider allows:
+        // stability needs h < 2/sqrt(k), and this leaves a wide margin.
+        const h = Math.min(left, 1 / 480);
+        this.vx += ((this.holdTarget.x - this.x) * k - this.vx * c) * h;
+        this.vy += ((this.holdTarget.y - this.y) * k - this.vy * c) * h;
+        this.x += this.vx * h;
+        this.y += this.vy * h;
+        left -= h;
+      }
       // A drag may go anywhere on the desktop, but not off it entirely.
       this.x = clamp(this.x, this.union.x1 + this.radius, this.union.x2 - this.radius);
       this.y = clamp(this.y, this.union.y1 + this.radius, this.union.y2 - this.radius);
@@ -268,10 +290,11 @@ export class Physics {
 
       // Ease into arrival: cruise when far, slow down as it closes in, so it
       // settles onto a spot instead of jittering around it.
+      const tight = 1 + this.trackTight * 3.4;
       let wantVx = 0;
       let wantVy = 0;
       if (dist > 0.5) {
-        const speed = Math.min(this.cruise, dist * 2.4);
+        const speed = Math.min(this.cruise * tight, dist * 2.4 * tight);
         wantVx = (dx / dist) * speed;
         wantVy = (dy / dist) * speed;
       }
@@ -279,8 +302,8 @@ export class Physics {
       // gives flight its weight — but that same lag overshoots on arrival, so
       // tighten the loop once it is closing in.
       const closing = dist < this.radius * 2.5 ? 3.2 : 1;
-      this.vx = approach(this.vx, wantVx, this.steer * closing, dt);
-      this.vy = approach(this.vy, wantVy, this.steer * closing, dt);
+      this.vx = approach(this.vx, wantVx, this.steer * closing * tight, dt);
+      this.vy = approach(this.vy, wantVy, this.steer * closing * tight, dt);
       this.x += this.vx * dt;
       this.y += this.vy * dt;
       this.clampToDesktop();

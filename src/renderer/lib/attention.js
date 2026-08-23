@@ -14,6 +14,8 @@ import { clamp, approach, rand, chance, makeNoise, TAU } from './geom.js';
 export const STANCE = {
   SHOULDER: 'shoulder',  // just off the cursor, watching what you point at
   PERCH: 'perch',        // parked at the corner of the window you are working in
+  RIDE: 'ride',          // sitting on the title bar, moving with the window
+  HOME: 'home',          // parked on the spot the user chose
   ROAM: 'roam',          // drifting around the active screen
   EDGE: 'edge',          // tucked against a screen edge, out of the way
   DODGE: 'dodge',        // actively getting out of the cursor's path
@@ -70,6 +72,18 @@ export class Attention {
     this.drift = { a: makeNoise(41), b: makeNoise(97) };
     this.enabled = true;         // follow the cursor at all
     this.watchApps = true;
+
+    // Riding: sit on the window's title bar and go where it goes.
+    this.rideWindows = true;
+    this.lastRectKey = '';
+    this.rectMovedAt = -999;
+    this.tracking = false;       // the thing we are following is moving right now
+
+    // A spot the user picked, in absolute desktop coordinates. While they are
+    // heads-down this is where it waits, instead of hovering near the cursor.
+    this.home = null;            // { x, y } or null
+    this.homeWhenBusy = true;
+    this.focusMode = false;      // go home, stay there, stop performing
   }
 
   // ---- inputs -------------------------------------------------------------
@@ -142,14 +156,33 @@ export class Attention {
     if (this.typing && !wasTyping) events.push({ type: 'typing' });
     if (!this.typing && wasTyping && this.typingFor > 3) events.push({ type: 'stoppedTyping' });
 
+    // Notice when the window we might be riding actually moves, so the flight
+    // loop can tighten up for exactly as long as it is being dragged.
+    const rect = this.app && this.app.rect;
+    if (rect) {
+      const key = `${rect.x},${rect.y},${rect.w},${rect.h}`;
+      if (key !== this.lastRectKey) {
+        this.lastRectKey = key;
+        this.rectMovedAt = this.t;
+      }
+    }
+
     this.chooseStance(ctx);
     this.chooseTarget(dt, ctx, events);
+
+    this.tracking = this.stance === STANCE.RIDE && (this.t - this.rectMovedAt) < 1.1;
 
     return events;
   }
 
   chooseStance(ctx) {
-    if (!this.enabled) return this.setStance(STANCE.ROAM, 4);
+    // Focus mode is a deliberate choice by the user: park on the home spot and
+    // stop competing for attention until they turn it off.
+    if (this.focusMode && this.home) return this.setStance(STANCE.HOME, 0);
+
+    if (!this.enabled) {
+      return this.setStance(this.home && this.homeWhenBusy ? STANCE.HOME : STANCE.ROAM, 4);
+    }
 
     // Getting out of the way beats everything else.
     if (this.dodgeFor > 0) return;
@@ -157,10 +190,14 @@ export class Attention {
     const away = this.idleSeconds > 45;
     if (away) return this.setStance(STANCE.ROAM, 6);
 
-    // While typing, the cursor is meaningless — sit beside the window instead.
+    // While typing the cursor is meaningless. In order of preference: the spot
+    // the user chose, riding the window they are working in, beside it, or a
+    // screen edge when there is nothing to go on.
     if (this.typing && this.typingFor > 1.2) {
-      const canPerch = this.watchApps && this.app && this.app.rect;
-      return this.setStance(canPerch ? STANCE.PERCH : STANCE.EDGE, 3);
+      if (this.home && this.homeWhenBusy) return this.setStance(STANCE.HOME, 3);
+      const hasWindow = this.watchApps && this.app && this.app.rect;
+      if (!hasWindow) return this.setStance(STANCE.EDGE, 3);
+      return this.setStance(this.rideWindows ? STANCE.RIDE : STANCE.PERCH, 3);
     }
 
     if (this.stillFor > 12) return this.setStance(STANCE.ROAM, 5);
@@ -210,6 +247,41 @@ export class Attention {
         tx = this.cursor.x + (ax / d) * (gap * 2.1);
         ty = this.cursor.y + (ay / d) * (gap * 1.6) - 40;
         if (this.dodgeFor <= 0) { this.stance = STANCE.SHOULDER; this.anchor.set = false; }
+        break;
+      }
+
+      case STANCE.HOME: {
+        if (!this.home) { this.stance = STANCE.EDGE; break; }
+        tx = this.home.x;
+        ty = this.home.y;
+        break;
+      }
+
+      // Sitting on the window itself, so dragging the window carries it along.
+      // The title bar is the one strip of a window that is never content, which
+      // is why it is the only place a mascot can sit without being in the way.
+      case STANCE.RIDE: {
+        const r = this.app && this.app.rect;
+        if (!r) { this.stance = STANCE.EDGE; break; }
+        const host = nearestDisplay(displays, r.x + r.w / 2, r.y);
+        const perched = r.y - radius * 0.42;
+        // Two thirds along the bar, but never so close to an end that the body
+        // hangs off it. A window too narrow to allow any choice gets the middle.
+        const inset = radius + 16;
+        const alongBar = r.w > inset * 2
+          ? r.x + clamp(r.w * 0.66, inset, r.w - inset)
+          : r.x + r.w / 2;
+
+        if (perched - radius * 0.55 >= host.y) {
+          tx = alongBar;
+          ty = perched;
+        } else {
+          // Flush with the top of the screen — usually maximised, so there is no
+          // "above" to sit on. Tuck inside the bar on the LEFT, well clear of the
+          // minimise / maximise / close cluster on the right.
+          tx = r.x + radius * 0.95;
+          ty = r.y + radius * 0.72;
+        }
         break;
       }
 
@@ -287,7 +359,11 @@ export class Attention {
     }
 
     // A slow figure-eight drift so it never hangs perfectly still in the air.
-    const amp = this.stance === STANCE.SHOULDER ? 16 : 22;
+    // Riding is the exception: a body wobbling around on a title bar reads as
+    // broken rather than alive, so it sits nearly still there.
+    const amp = this.stance === STANCE.RIDE ? 2.5
+      : this.stance === STANCE.HOME ? 9
+      : this.stance === STANCE.SHOULDER ? 16 : 22;
     tx += this.drift.a(this.t * 0.22) * amp;
     ty += this.drift.b(this.t * 0.17) * amp * 0.7;
 

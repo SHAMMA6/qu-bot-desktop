@@ -2,6 +2,7 @@
 // and provides the tray, context menu and global shortcuts.
 
 const path = require('path');
+const os = require('os');
 const {
   app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage,
   globalShortcut, powerMonitor, shell, nativeTheme,
@@ -10,6 +11,7 @@ const {
 const { Store } = require('./store.cjs');
 const { loadCatalog, buildContextMenu, buildTrayMenu } = require('./menus.cjs');
 const { Awareness } = require('./awareness.cjs');
+const { Timers } = require('./timers.cjs');
 
 const isDev = process.argv.includes('--dev');
 
@@ -31,6 +33,12 @@ let lastEmotion = 'idle';
 let hostDisplayId = null;
 let hidden = false;
 let awareness = null;
+let timers = null;
+let machineTimer = null;
+let updateTimer = null;
+let updateReady = null;   // version string once an update is downloaded
+let lastCpuSample = null;
+let session = null;      // what startSession() told us about this launch
 
 // ---------------------------------------------------------------- geometry
 // The overlay covers exactly ONE display at a time and follows the mascot between
@@ -214,6 +222,121 @@ function startAwareness() {
   if (store.get('watchActivity')) awareness.start(); else awareness.stop();
 }
 
+// System-wide CPU load, from the deltas between two samples of os.cpus(). The
+// absolute totals are since boot and therefore useless on their own; only the
+// change between samples says anything about right now.
+function sampleCpu() {
+  let idle = 0;
+  let total = 0;
+  for (const cpu of os.cpus()) {
+    for (const k of Object.keys(cpu.times)) total += cpu.times[k];
+    idle += cpu.times.idle;
+  }
+  const prev = lastCpuSample;
+  lastCpuSample = { idle, total };
+  if (!prev) return 0;
+  const dTotal = total - prev.total;
+  const dIdle = idle - prev.idle;
+  if (dTotal <= 0) return 0;
+  return Math.max(0, Math.min(1, 1 - dIdle / dTotal));
+}
+
+function startMachineFeed() {
+  clearInterval(machineTimer);
+  sampleCpu();
+  machineTimer = setInterval(() => {
+    if (!overlay || overlay.isDestroyed() || !store.get('machineAware')) return;
+    send('machine', { cpu: sampleCpu() });
+  }, 5000);
+}
+
+// ---------------------------------------------------------------- timers
+function startTimers() {
+  timers = new Timers(store, (fired) => {
+    // A timer going off is exactly the moment the mascot should be visible.
+    if (hidden) toggleVisible(true);
+    send('command', 'timer', fired);
+    refreshTray();
+  });
+  timers.start();
+}
+
+function addTimer(minutes, label) {
+  if (!timers) return null;
+  const entry = timers.add(minutes, label);
+  if (entry) {
+    command('timerSet', { minutes: entry.minutes, label: entry.label });
+    refreshTray();
+  }
+  return entry;
+}
+
+function startOrStopPomodoro() {
+  if (!timers) return;
+  if (timers.pomodoro) {
+    timers.stopPomodoro();
+    command('say', { emotion: 'content', text: null });
+  } else {
+    const { minutes } = timers.startPomodoro();
+    if (hidden) toggleVisible(true);
+    command('timer', { kind: 'pomodoro-work', minutes, label: 'focus' });
+  }
+  refreshTray();
+}
+
+// ---------------------------------------------------------------- the shelf
+function shelfAction(action, file) {
+  const list = store.shelf || [];
+  if (action === 'open' && file) { shell.openPath(file).catch(() => {}); return; }
+  if (action === 'reveal' && file) { shell.showItemInFolder(file); return; }
+  if (action === 'drop' && file) {
+    store.setShelf(list.filter((f) => f !== file));
+  } else if (action === 'clear') {
+    store.setShelf([]);
+  } else {
+    return;
+  }
+  send('command', 'shelf', { files: store.shelf });
+  refreshTray();
+}
+
+// ---------------------------------------------------------------- updates
+// Only ever runs in a packaged build: in development there is no signed feed to
+// check against, and nothing useful to install. Loaded lazily and guarded, so a
+// missing or broken updater degrades to "no updates" rather than a crash.
+function checkForUpdates() {
+  if (!app.isPackaged || !store.get('autoUpdate')) return;
+  let autoUpdater;
+  try {
+    ({ autoUpdater } = require('electron-updater'));
+  } catch {
+    return;
+  }
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.on('update-downloaded', (info) => {
+    updateReady = (info && info.version) || 'a new version';
+    if (hidden) toggleVisible(true);
+    command('say', {
+      emotion: 'excited',
+      text: `version ${updateReady} is ready. restart me when you like.`,
+    });
+    refreshTray();
+  });
+  autoUpdater.on('error', () => { /* offline, or no release yet */ });
+  const run = () => autoUpdater.checkForUpdates().catch(() => {});
+  setTimeout(run, 8000);
+  updateTimer = setInterval(run, 6 * 60 * 60 * 1000);
+}
+
+function installUpdate() {
+  try {
+    const { autoUpdater } = require('electron-updater');
+    app.isQuitting = true;
+    autoUpdater.quitAndInstall();
+  } catch { /* nothing to install */ }
+}
+
 // ---------------------------------------------------------------- tray
 function trayImage() {
   const dark = nativeTheme.shouldUseDarkColors;
@@ -236,10 +359,18 @@ function refreshTray() {
   if (!tray) return;
   tray.setContextMenu(buildTrayMenu({
     settings: store.all, hidden, emotion: lastEmotion,
+    timers: timers ? timers.snapshot() : { pomodoro: null, timers: [] },
+    shelf: store.shelf,
     onCommand: command,
     onSetting: (patch) => updateSettings(patch),
     onToggleVisible: toggleVisible,
     onSettings: openSettings,
+    onTimer: addTimer,
+    onCancelTimer: (id) => { timers?.cancel(id); refreshTray(); },
+    onPomodoro: startOrStopPomodoro,
+    onShelf: shelfAction,
+    updateReady,
+    onInstallUpdate: installUpdate,
     onQuit: () => { app.isQuitting = true; app.quit(); },
   }));
 }
@@ -293,6 +424,10 @@ function updateSettings(patch) {
   if (patch.watchActivity !== undefined && awareness) {
     if (next.watchActivity) awareness.start(); else awareness.stop();
   }
+  if (patch.focusMode !== undefined) {
+    if (hidden && next.focusMode) toggleVisible(true);
+    send('command', 'focusToggle', { on: !!next.focusMode });
+  }
   if (!onlyPosition) {
     send('settings', next);
     refreshTray();
@@ -342,7 +477,21 @@ ipcMain.handle('bot:ready', () => {
     displays: displayList(),
     hostId: host.id,
     position,
+    // Everything it remembers about the two of you, plus what this launch
+    // looked like (first ever run, new day, how long you were gone).
+    bond: { ...store.bondSummary(), ...(session || {}) },
+    shelf: store.shelf,
   };
+});
+
+ipcMain.on('bond:save', (_e, status) => {
+  store.updateBond(status);
+});
+
+ipcMain.on('shelf:set', (_e, paths) => {
+  if (!Array.isArray(paths)) return;
+  store.setShelf(paths.filter((p) => typeof p === 'string').slice(0, 6));
+  refreshTray();
 });
 
 // The renderer decides which display the body is on — it knows the position every
@@ -358,12 +507,21 @@ ipcMain.on('bot:interactive', (_e, interactive) => {
 });
 
 ipcMain.on('bot:menu', (_e, ctx) => {
+  command('menuOpen');
   const menu = buildContextMenu({
     settings: store.all,
     emotion: (ctx && ctx.emotion) || lastEmotion,
+    timers: timers ? timers.snapshot() : { pomodoro: null, timers: [] },
+    shelf: (ctx && ctx.shelf) || store.shelf,
     onCommand: command,
     onSetting: updateSettings,
     onSettings: openSettings,
+    onTimer: addTimer,
+    onCancelTimer: (id) => { timers?.cancel(id); refreshTray(); },
+    onPomodoro: startOrStopPomodoro,
+    onShelf: shelfAction,
+    updateReady,
+    onInstallUpdate: installUpdate,
     onHide: () => toggleVisible(false),
     onQuit: () => { app.isQuitting = true; app.quit(); },
   });
@@ -393,6 +551,28 @@ ipcMain.on('settings:reset', () => {
   if (settingsWin && !settingsWin.isDestroyed()) settingsWin.webContents.send('settings', next);
 });
 ipcMain.on('settings:command', (_e, name, payload) => command(name, payload));
+
+ipcMain.handle('bond:get', () => store.bondSummary());
+ipcMain.handle('bond:forget', () => {
+  const summary = store.resetBond();
+  send('command', 'reset', {});
+  return summary;
+});
+
+ipcMain.handle('timers:get', () => (timers ? timers.snapshot() : { pomodoro: null, timers: [] }));
+ipcMain.handle('timers:add', (_e, minutes, label) => {
+  addTimer(minutes, label);
+  return timers ? timers.snapshot() : { pomodoro: null, timers: [] };
+});
+ipcMain.handle('timers:cancel', (_e, id) => {
+  timers?.cancel(id);
+  refreshTray();
+  return timers ? timers.snapshot() : { pomodoro: null, timers: [] };
+});
+ipcMain.handle('timers:pomodoro', () => {
+  startOrStopPomodoro();
+  return timers ? timers.snapshot() : { pomodoro: null, timers: [] };
+});
 ipcMain.on('settings:openExternal', (_e, url) => {
   if (/^https:\/\//.test(url)) shell.openExternal(url);
 });
@@ -410,6 +590,9 @@ if (!app.requestSingleInstanceLock()) {
     app.setAppUserModelId('com.qubot.desktop');
     store = new Store();
     hidden = process.argv.includes('--hidden');
+    // Roll the day counter and work out how long we have been apart, before the
+    // renderer asks for it in bot:ready.
+    session = store.startSession();
 
     // Menu labels come from the same ES modules the renderer uses.
     await loadCatalog();
@@ -419,6 +602,9 @@ if (!app.requestSingleInstanceLock()) {
     startCursorFeed();
     startIdleFeed();
     startAwareness();
+    startMachineFeed();
+    startTimers();
+    checkForUpdates();
 
     screen.on('display-added', onDisplaysChanged);
     screen.on('display-removed', onDisplaysChanged);
@@ -433,6 +619,10 @@ if (!app.requestSingleInstanceLock()) {
     globalShortcut.register('Control+Alt+B', summon);
     globalShortcut.register('Control+Alt+H', () => toggleVisible());
     globalShortcut.register('Control+Alt+C', () => command('celebrate'));
+    // Park on the home spot and go quiet.
+    globalShortcut.register('Control+Alt+F', () => updateSettings({ focusMode: !store.get('focusMode') }));
+    // "How long have I been at this?"
+    globalShortcut.register('Control+Alt+L', () => command('report'));
 
     app.on('activate', () => { if (!overlay) createOverlay(); });
   });
@@ -444,8 +634,11 @@ if (!app.requestSingleInstanceLock()) {
   app.on('before-quit', () => {
     app.isQuitting = true;
     awareness?.stop();
+    timers?.stop();
     clearInterval(cursorTimer);
     clearInterval(idleTimer);
+    clearInterval(machineTimer);
+    clearInterval(updateTimer);
     globalShortcut.unregisterAll();
     store?.flush();
   });

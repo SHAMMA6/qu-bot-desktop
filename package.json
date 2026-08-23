@@ -1,7 +1,7 @@
 {
   "name": "qu-bot-desktop",
   "productName": "QU Bot",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A desktop mascot — a living little bot that roams your screen, reacts to you, and has a lot of feelings.",
   "type": "module",
   "main": "src/main/main.cjs",
@@ -10,7 +10,7 @@
     "dev": "electron . --dev",
     "build": "electron-builder --win",
     "pack": "electron-builder --win --dir",
-    "test": "node tools/validate.mjs && node tools/test-displays.mjs && node tools/test-attention.mjs",
+    "test": "node tools/validate.mjs && node tools/test-displays.mjs && node tools/test-attention.mjs && node tools/test-companion.mjs",
     "icons": "node tools/make-icons.cjs"
   },
   "author": "SHAMMA6",
@@ -25,7 +25,8 @@
     "files": [
       "src/**/*",
       "assets/**/*",
-      "package.json"
+      "package.json",
+      "node_modules/**/*"
     ],
     "win": {
       "target": [
@@ -45,10 +46,41 @@
     },
     "directories": {
       "output": "dist"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "SHAMMA6",
+        "repo": "qu-bot-desktop"
+      }
+    ],
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "assets/icon.png",
+      "category": "public.app-category.entertainment"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "icon": "assets/icon.png",
+      "category": "Utility"
+    },
+    "dmg": {
+      "artifactName": "QU-Bot-${version}-mac.${ext}"
+    },
+    "appImage": {
+      "artifactName": "QU-Bot-${version}-linux.${ext}"
     }
   },
   "repository": {
     "type": "git",
     "url": "https://github.com/SHAMMA6/qu-bot-desktop.git"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
   }
 }
