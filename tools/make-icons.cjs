@@ -221,10 +221,13 @@ function main() {
 
   // App icon: the brand silhouette in violet with white eyes.
   const app = { shape: 'blob', expression: 0, coat: '#885CF5', ink: '#FFFFFF', data };
+  // The ICO format tops out at 256px, but macOS refuses to build an .icns from
+  // anything smaller than 512 — and 1024 is what a Retina dock actually wants.
+  // So the master PNG is rendered separately from the ICO's ladder.
   const sizes = [16, 24, 32, 48, 64, 128, 256];
   const pngs = sizes.map((s) => ({ size: s, png: render(s, app) }));
 
-  fs.writeFileSync(path.join(OUT, 'icon.png'), pngs.find((p) => p.size === 256).png);
+  fs.writeFileSync(path.join(OUT, 'icon.png'), render(1024, app));
   fs.writeFileSync(path.join(OUT, 'icon.ico'), encodeICO(pngs));
 
   // Tray icons: flat monochrome so they sit correctly on light and dark taskbars.
