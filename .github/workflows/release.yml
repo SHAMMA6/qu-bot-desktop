@@ -70,7 +70,7 @@ jobs:
           echo "tag=v$VERSION"    >> "$GITHUB_OUTPUT"
           git add package.json package-lock.json
           git commit -m "Release v$VERSION"
-          git tag -a "v$VERSION" -m "QU Bot $VERSION"
+          git tag -a "v$VERSION" -m "EMoO BOT $VERSION"
           git push origin HEAD:${{ github.ref_name }}
           git push origin "v$VERSION"
 
@@ -82,7 +82,7 @@ jobs:
         run: |
           gh release create "${{ steps.bump.outputs.tag }}" \
             --draft \
-            --title "QU Bot ${{ steps.bump.outputs.version }}" \
+            --title "EMoO BOT ${{ steps.bump.outputs.version }}" \
             --generate-notes
 
   build:
@@ -169,7 +169,7 @@ jobs:
           TAG: ${{ needs.prepare.outputs.tag }}
         run: |
           {
-            echo "## QU Bot ${{ needs.prepare.outputs.version }}"
+            echo "## EMoO BOT ${{ needs.prepare.outputs.version }}"
             if [ "${{ inputs.dry_run }}" = "true" ]; then
               echo "Built and verified, left as a **draft**."
             else

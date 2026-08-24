@@ -11,7 +11,7 @@ const path = require('path');
 const { app } = require('electron');
 
 const DEFAULTS = {
-  name: 'QU Bot',
+  name: 'EMoO BOT',
   // 'auto' follows the system locale; 'en' / 'ar' pin it.
   language: 'auto',
   coat: 'chalk',
@@ -31,7 +31,12 @@ const DEFAULTS = {
   alwaysOnTop: true,
   soundEnabled: true,
   volume: 0.5,
-  launchOnLogin: false,
+  // On by default: a desk companion that is only there on the days you remember
+  // to start it is not a companion. Switch it off in Settings at any time.
+  launchOnLogin: true,
+  // Whether we have already told them it starts with Windows. Something that
+  // launches itself should say so once, not silently.
+  startupNoticeShown: false,
   greetOnLaunch: true,
   // What it wears: 'auto' follows the calendar, 'none' is bare, or name one
   // outright and it keeps it all year.
@@ -119,6 +124,10 @@ class Store {
       // Migration: the old boolean became a choice. Someone who had switched
       // seasonal hats off meant "none", not "back to automatic".
       if (parsed.accessory === undefined && parsed.seasonal === false) this.data.accessory = 'none';
+      // Migration: the app was renamed. A saved name that is only the old
+      // default is not a name anyone chose, so it follows the rename; anything
+      // else was deliberate and is left exactly as it is.
+      if (parsed.name === 'QU Bot') this.data.name = DEFAULTS.name;
       if (Array.isArray(parsed.timers)) this.timers = parsed.timers;
       if (Array.isArray(parsed.shelf)) this.shelf = parsed.shelf;
     }
@@ -164,7 +173,7 @@ class Store {
     for (const k of ['gravity', 'roam', 'chatter', 'sleepWhenIdle', 'nudges',
       'gazeFollowsCursor', 'alwaysOnTop', 'soundEnabled', 'launchOnLogin', 'greetOnLaunch',
       'followCursor', 'watchActivity', 'rideWindows', 'machineAware',
-      'focusReports', 'autoUpdate', 'homeWhenBusy', 'focusMode']) {
+      'focusReports', 'autoUpdate', 'homeWhenBusy', 'focusMode', 'startupNoticeShown']) {
       d[k] = !!d[k];
     }
   }
@@ -305,7 +314,7 @@ class Store {
       fs.writeFileSync(this.file, this.serialize());
     } catch (err) {
       // On shutdown there is nothing useful to do about this.
-      if (!app.isQuitting) console.error('[qubot] could not save settings:', err.message);
+      if (!app.isQuitting) console.error('[emoo] could not save settings:', err.message);
     }
   }
 }

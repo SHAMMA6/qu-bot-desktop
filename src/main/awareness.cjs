@@ -19,7 +19,7 @@ const { spawn } = require('child_process');
 const { app, screen } = require('electron');
 
 // What this app's own process is called: 'electron' when run from source, the
-// product name once packaged ('QU Bot').
+// product name once packaged ('EMoO BOT').
 const SELF_NAMES = new Set([
   'electron',
   path.basename(process.execPath, '.exe').toLowerCase(),
@@ -54,7 +54,7 @@ $last = ''
 $quiet = 999
 while ($true) {
   # Never outlive the app. A normal quit kills this process directly, but if
-  # QU Bot is force-terminated nothing would clean it up, and an orphaned polling
+  # EMoO BOT is force-terminated nothing would clean it up, and an orphaned polling
   # loop is exactly the kind of thing that should not be left running.
   if ($parent -ne 0) {
     try { [void][System.Diagnostics.Process]::GetProcessById($parent) } catch { exit }
@@ -120,7 +120,7 @@ class Awareness {
           '-parent', String(process.pid)],
         { windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] });
     } catch (err) {
-      console.error('[qubot] activity watcher could not start:', err.message);
+      console.error('[emoo] activity watcher could not start:', err.message);
       this.child = null;
       return;
     }

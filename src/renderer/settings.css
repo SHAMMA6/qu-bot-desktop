@@ -89,7 +89,7 @@ body {
 .tab.is-active { color: var(--fg); border-bottom-color: var(--accent); }
 
 /* ---------------------------------------------------------- panels */
-main { padding: 18px 22px 32px; }
+main { padding: 18px 22px 10px; }
 .panel { display: none; }
 .panel.is-active { display: block; }
 
@@ -351,3 +351,27 @@ input[type=text]:focus, input[type=number]:focus {
    direction inside an RTL paragraph rather than being reordered around it. */
 [dir='rtl'] #updateState,
 [dir='rtl'] .keys dd { unicode-bidi: plaintext; }
+
+/* ---------------------------------------------------------- credit */
+/* Below the tab panels rather than inside one, so it shows on every tab. */
+.credit {
+  border-top: 1px solid var(--line);
+  margin: 10px 22px 0;
+  padding: 14px 0 22px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.8;
+}
+
+/* Per line, not on the footer: `unicode-bidi` does not inherit, so setting it
+   on the block above leaves each <p> to take its direction from the document.
+   In Arabic that dragged the © to the far end of "© 2026 EMoO BOT". Each line
+   takes its direction from its own first strong character instead. */
+.credit p { unicode-bidi: plaintext; }
+
+.credit strong {
+  color: var(--fg);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}

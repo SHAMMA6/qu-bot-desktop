@@ -8,7 +8,7 @@ import { COATS, resolveCoat } from '../shared/themes.js';
 import { centroid, ringPath, clamp, TAU, approach, rand } from './lib/geom.js';
 import { t as translate, isRTL, LANGUAGES } from '../shared/i18n.js';
 
-const api = window.qubotSettings;
+const api = window.emooSettings;
 const $ = (id) => document.getElementById(id);
 
 // Switching language rebuilds every list, because their labels are baked into
@@ -309,10 +309,19 @@ function applyLanguage(next) {
   buildCorners();
   buildLanguages();
   buildQuickTimerLabels();
+  renderCredit();
   if (settings) render(settings);
   renderTimers();
   renderBond();
   if (lastUpdate) renderUpdate(lastUpdate);
+}
+
+// The credit line. Not part of the generic [data-i18n] sweep because the
+// copyright carries the current year, and the dedication is a name rather than
+// a string to be translated around.
+function renderCredit() {
+  $('creditRights').textContent = t('credit.rights', { year: new Date().getFullYear() });
+  $('creditMade').firstElementChild.textContent = t('credit.made');
 }
 
 function buildQuickTimerLabels() {
@@ -425,7 +434,7 @@ function render(next) {
   // Do not fight the user mid-word: every keystroke round-trips through the
   // store and comes back here, which would reset the caret to the end.
   if (document.activeElement !== $('botName')) $('botName').value = next.name || '';
-  $('heroName').textContent = next.name || 'QU Bot';
+  $('heroName').textContent = next.name || 'EMoO BOT';
 
   for (const key of PERCENT_SLIDERS) {
     const pct = Math.round((next[key] ?? 0) * 100);

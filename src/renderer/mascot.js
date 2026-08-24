@@ -19,7 +19,7 @@ import { say, LINES, setVoice, setLanguage } from './lib/dialogue.js';
 import { resolveCoat } from '../shared/themes.js';
 import { clamp, rand, pick, chance, approach, ease, lerpExpression, makeNoise, TAU } from './lib/geom.js';
 
-const api = window.qubot;
+const api = window.emoo;
 
 const stage = document.getElementById('stage');
 const botEl = document.getElementById('bot');
@@ -1114,7 +1114,7 @@ bubble.onType = () => { if (chance(0.28)) sound.type(); };
 
 // Debug hook: lets a dev capture pose the character deterministically. Exposes
 // only this page's own state — nothing privileged crosses the preload boundary.
-window.__qubot = {
+window.__emoo = {
   state: S, physics, brain, attention, focus, sound, fx, bubble, mark,
   setEmotion, speak, commands: COMMANDS,
   pose({ x, y, emotion, shape, text, burst, count, coat, ink }) {

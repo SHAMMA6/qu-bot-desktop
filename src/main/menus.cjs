@@ -239,7 +239,7 @@ function commonSections(o) {
 }
 
 const title = (settings, emotion) => {
-  const name = settings.name || 'QU Bot';
+  const name = settings.name || 'EMoO BOT';
   const feeling = catalog.EMOTIONS[emotion] ? tr(`emotion.${emotion}`) : emotion;
   return `${name} — ${feeling}`;
 };
@@ -297,7 +297,7 @@ function buildContextMenu(o) {
     ...updateItems(update, onInstallUpdate, onCheckUpdate),
     { type: 'separator' },
     { label: tr('menu.hide'), accelerator: 'Ctrl+Alt+H', click: onHide },
-    { label: tr('menu.quit', { name: settings.name || 'QU Bot' }), click: onQuit },
+    { label: tr('menu.quit', { name: settings.name || 'EMoO BOT' }), click: onQuit },
   ]);
 }
 
@@ -313,7 +313,7 @@ function buildTrayMenu(o) {
     ...commonSections(o),
     ...updateItems(update, onInstallUpdate, onCheckUpdate),
     { type: 'separator' },
-    { label: tr('menu.quit', { name: settings.name || 'QU Bot' }), click: onQuit },
+    { label: tr('menu.quit', { name: settings.name || 'EMoO BOT' }), click: onQuit },
   ]);
 }
 

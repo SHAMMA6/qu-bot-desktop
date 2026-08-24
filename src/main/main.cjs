@@ -3,6 +3,7 @@
 
 const path = require('path');
 const os = require('os');
+const fs = require('fs');
 const {
   app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage,
   globalShortcut, powerMonitor, shell, nativeTheme,
@@ -15,6 +16,14 @@ const { Timers } = require('./timers.cjs');
 const { Updater } = require('./updater.cjs');
 
 const isDev = process.argv.includes('--dev');
+
+// Kept as com.qubot.desktop through the rename to EMoO BOT, deliberately. This
+// one string is three separate identities at once: what Windows files the app's
+// shortcuts and notifications under, the GUID electron-builder derives the NSIS
+// upgrade path from, and the name of the value in the Run key. Change it and an
+// installed copy gets a second app beside it instead of an updated one, and its
+// old startup entry is orphaned rather than replaced.
+const APP_ID = 'com.qubot.desktop';
 
 // Dev aid: `--shot=out.png[,delayMs]` captures the overlay's own pixels (alpha
 // preserved, desktop excluded) and exits. Used to eyeball the art without a
@@ -39,6 +48,7 @@ let machineTimer = null;
 let updater = null;
 let announcedUpdate = null;   // version we have already told the user about
 let lastCpuSample = null;
+let settleTimers = [];   // the "are you actually on screen yet" passes after a cold boot
 let session = null;      // what startSession() told us about this launch
 let i18n = null;         // the shared string table, loaded with the catalog
 let lang = 'en';         // 'auto' resolved against the system locale
@@ -95,7 +105,7 @@ function useDisplay(display, { force = false } = {}) {
   const b = overlay.getBounds();
   send('layout', { x: display.bounds.x, y: display.bounds.y, width: b.width, height: b.height });
   if (isDev) {
-    console.log(`[qubot] overlay ${from} -> ${display.id}`,
+    console.log(`[emoo] overlay ${from} -> ${display.id}`,
       `origin=(${display.bounds.x},${display.bounds.y})`,
       `size=${b.width}x${b.height}`, `scale=${display.scaleFactor}`);
   }
@@ -154,6 +164,115 @@ function createOverlay() {
   });
   overlay.webContents.on('render-process-gone', (_e, d) => console.error('[renderer gone]', d));
   overlay.webContents.on('did-fail-load', (_e, code, desc) => console.error('[load failed]', code, desc));
+}
+
+// ---------------------------------------------------------------- coming up with Windows
+// Windows starts login items while the shell is still assembling itself. In that
+// first stretch the desktop, the taskbar and the final display metrics all
+// arrive AFTER we do, and a transparent, always-on-top, non-focusable overlay
+// created into that gap can end up behind everything, sized to a work area that
+// no longer exists, or simply never composited at all.
+//
+// The symptom was exact: after signing in, the app was plainly running — tray
+// icon, menus, timers, all alive — with nothing on screen, and the only fix
+// anyone found was quitting and starting it again. So the overlay no longer
+// trusts the first frame. It re-asserts itself a handful of times over the first
+// half minute, which costs nothing on a warm start and is the whole difference
+// on a cold one.
+const SETTLE_AT = [700, 2000, 5000, 10000, 20000, 35000];
+// A launch at sign-in races the whole shell coming up, so it keeps looking for
+// longer than a launch you asked for by hand.
+const LOGIN_SETTLE_AT = [...SETTLE_AT, 60000, 90000];
+
+function ensureVisible() {
+  if (!overlay || overlay.isDestroyed() || hidden) return;
+  const host = displayById(hostDisplayId)
+    || displayAt(store.get('position') || defaultPosition());
+  // The work area we were handed at login is often the pre-taskbar one. Re-take
+  // it, and re-send the layout so the renderer clamps against the real screen.
+  useDisplay(host, { force: true });
+  // showInactive, not show: the mascot appearing must never pull focus off
+  // whatever the user is signing in to. Unconditional, because the failure this
+  // exists for is a window that believes it is visible and is not on screen.
+  overlay.showInactive();
+  overlay.setAlwaysOnTop(!!store.get('alwaysOnTop'), 'screen-saver');
+  // Explicitly re-raise: at login the shell hands out z-order after we have
+  // already claimed ours, which is how the overlay ended up behind the desktop.
+  if (store.get('alwaysOnTop')) overlay.moveTop();
+  overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  publishDisplays();
+  send('command', 'reclamp', {});
+}
+
+function scheduleSettle(at = SETTLE_AT) {
+  clearSettle();
+  settleTimers = at.map((ms) => setTimeout(ensureVisible, ms));
+}
+
+function clearSettle() {
+  for (const t of settleTimers) clearTimeout(t);
+  settleTimers = [];
+}
+
+// Windows remembers the login entry — path, arguments and all — from whenever it
+// was last written, so re-registering it on every launch is the only way a change
+// here reaches copies that were installed before it. That matters: the old entry
+// started the app with `--hidden`, which is the other half of why nothing showed
+// up after signing in.
+function applyLoginItem() {
+  // Registering a dev run would put Electron itself in the user's startup list.
+  if (!app.isPackaged || process.platform === 'linux') return;
+  try {
+    // A portable build runs from a temporary extraction directory that is
+    // different every launch, so process.execPath — what Electron would record
+    // by default — would be a dead path by the next boot. electron-builder
+    // hands us the real .exe the user double-clicked; register that instead.
+    const portable = process.env.PORTABLE_EXECUTABLE_FILE;
+    app.setLoginItemSettings({
+      openAtLogin: !!store.get('launchOnLogin'),
+      // Pinned rather than left to default to the AppUserModelId, so this always
+      // lands on the same Run value the old build wrote — replacing the stale
+      // `--hidden` entry instead of leaving it behind to race this one.
+      name: APP_ID,
+      ...(portable ? { path: portable } : {}),
+      // Deliberately no `--hidden`. "Starts with Windows" has to mean it is
+      // there when the desktop is, not that it is running where you cannot see it.
+      args: ['--login'],
+    });
+  } catch (err) {
+    console.error('[emoo] could not write the login item:', err.message);
+  }
+}
+
+// Something that launches itself should say so, once. Told silently, this is the
+// kind of thing people meet for the first time in Task Manager.
+function announceStartup() {
+  if (!store.get('launchOnLogin') || store.get('startupNoticeShown')) return;
+  // Late enough to land after the launch greeting rather than on top of it. The
+  // flag is set when it is actually said, not when it is scheduled, so a quit in
+  // between does not swallow the one time this is ever mentioned.
+  setTimeout(() => {
+    if (!overlay || overlay.isDestroyed() || hidden) return;
+    store.set({ startupNoticeShown: true });
+    command('say', { emotion: 'happy', text: i18n.t(lang, 'startup.notice') });
+  }, 12000);
+}
+
+// The app used to be called QU Bot, and Electron derives userData from the
+// product name — so the rename on its own would have quietly handed everyone a
+// fresh profile: default settings, and a mascot that had forgotten them. Carry
+// the old file across the first time the new name runs.
+function migrateUserData() {
+  const target = path.join(app.getPath('userData'), 'settings.json');
+  const legacy = path.join(app.getPath('appData'), 'QU Bot', 'settings.json');
+  try {
+    if (fs.existsSync(target) || !fs.existsSync(legacy)) return;
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.copyFileSync(legacy, target);
+    console.log('[emoo] brought your settings over from QU Bot');
+  } catch (err) {
+    console.error('[emoo] could not bring the old settings over:', err.message);
+  }
 }
 
 function scheduleShot() {
@@ -359,7 +478,7 @@ function trayImage() {
 
 function createTray() {
   tray = new Tray(trayImage());
-  tray.setToolTip('QU Bot');
+  tray.setToolTip('EMoO BOT');
   refreshTray();
   tray.on('click', () => command('greet'));
   tray.on('double-click', () => openSettings());
@@ -406,7 +525,7 @@ function openSettings() {
     height: winH,
     minWidth: 420,
     minHeight: 520,
-    title: 'QU Bot',
+    title: 'EMoO BOT',
     icon: path.join(__dirname, '../../assets/icon.png'),
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#141418' : '#f6f6f4',
     autoHideMenuBar: true,
@@ -431,7 +550,7 @@ function updateSettings(patch) {
     overlay.setAlwaysOnTop(!!next.alwaysOnTop, 'screen-saver');
   }
   if (patch.launchOnLogin !== undefined) {
-    app.setLoginItemSettings({ openAtLogin: !!next.launchOnLogin, args: ['--hidden'] });
+    applyLoginItem();
   }
   if (patch.watchActivity !== undefined && awareness) {
     if (next.watchActivity) awareness.start(); else awareness.stop();
@@ -663,7 +782,8 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   app.whenReady().then(async () => {
-    app.setAppUserModelId('com.qubot.desktop');
+    app.setAppUserModelId(APP_ID);
+    migrateUserData();
     store = new Store();
     hidden = process.argv.includes('--hidden');
     // Roll the day counter and work out how long we have been apart, before the
@@ -686,6 +806,12 @@ if (!app.requestSingleInstanceLock()) {
     if (!known.includes(worn)) store.set({ accessory: 'auto' });
 
     createOverlay();
+    // Re-written every launch, not only when the switch is flipped: that is what
+    // carries the setting to a fresh install and what replaces the old, hidden
+    // login entry on copies that already have one.
+    applyLoginItem();
+    scheduleSettle(process.argv.includes('--login') ? LOGIN_SETTLE_AT : SETTLE_AT);
+    announceStartup();
     createTray();
     startCursorFeed();
     startIdleFeed();
@@ -698,11 +824,17 @@ if (!app.requestSingleInstanceLock()) {
     screen.on('display-removed', onDisplaysChanged);
     screen.on('display-metrics-changed', onDisplaysChanged);
 
+    // Waking from sleep and unlocking land in the same half-assembled desktop a
+    // cold boot does, so both get the same treatment as launch.
     powerMonitor.on('resume', () => {
       onDisplaysChanged();
+      scheduleSettle();
       command('wake');
     });
-    powerMonitor.on('unlock-screen', () => command('greet'));
+    powerMonitor.on('unlock-screen', () => {
+      scheduleSettle();
+      command('greet');
+    });
 
     globalShortcut.register('Control+Alt+B', summon);
     globalShortcut.register('Control+Alt+H', () => toggleVisible());
@@ -728,6 +860,7 @@ if (!app.requestSingleInstanceLock()) {
     clearInterval(cursorTimer);
     clearInterval(idleTimer);
     clearInterval(machineTimer);
+    clearSettle();
     updater?.stop();
     globalShortcut.unregisterAll();
     store?.flush();

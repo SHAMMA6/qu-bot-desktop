@@ -295,7 +295,14 @@ const EN = {
   'toggle.greetOnLaunch': 'Greet on launch',
   'toggle.greetOnLaunch.d': 'Says hello when it starts up',
   'toggle.launchOnLogin': 'Start with Windows',
-  'toggle.launchOnLogin.d': 'Launches quietly when you sign in',
+  'toggle.launchOnLogin.d': 'On by default — it is there when your desktop is',
+
+  // --- what it says the first time it has put itself in your startup list
+  'startup.notice': 'I start with Windows now. Turn that off in Settings whenever you like.',
+
+  // --- credit
+  'credit.rights': '© {year} EMoO BOT',
+  'credit.made': 'Made For EMAN MOSTAFA',
 
   // --- emotions (the tray title and the settings preview)
   'emotion.idle': "Idle",
@@ -634,7 +641,13 @@ const AR = {
   'toggle.greetOnLaunch': 'التحية عند التشغيل',
   'toggle.greetOnLaunch.d': 'يقول مرحبًا عند بدء التشغيل',
   'toggle.launchOnLogin': 'التشغيل مع ويندوز',
-  'toggle.launchOnLogin.d': 'يبدأ بهدوء عند تسجيل الدخول',
+  'toggle.launchOnLogin.d': 'مُفعّل افتراضيًا — يظهر فور ظهور سطح المكتب',
+
+  'startup.notice': 'صرت أبدأ مع ويندوز. يمكنك إيقاف ذلك من الإعدادات وقتما تشاء.',
+
+  // A dedication, not a label: the name stays as it is written.
+  'credit.rights': '© {year} EMoO BOT',
+  'credit.made': 'صُنع من أجل EMAN MOSTAFA',
 
   // --- emotions
   'emotion.idle': "خامل",

@@ -7,7 +7,7 @@ const on = (channel, cb) => {
   ipcRenderer.on(channel, (_e, ...args) => cb(...args));
 };
 
-contextBridge.exposeInMainWorld('qubot', {
+contextBridge.exposeInMainWorld('emoo', {
   // Handshake: returns settings, window metrics, screen bounds and start position.
   ready: () => ipcRenderer.invoke('bot:ready'),
 

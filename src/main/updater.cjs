@@ -29,7 +29,7 @@ function updateCapability({ packaged, platform, env = {}, target = null }) {
   if (platform === 'darwin') {
     // Squirrel.Mac validates the signature before swapping the bundle, so an
     // unsigned build can download an update and then refuse to apply it.
-    if (!env.QUBOT_SIGNED) {
+    if (!env.EMOO_SIGNED) {
       return { can: false, reason: 'unsigned macOS builds cannot self-update — download the new one' };
     }
     return { can: true };

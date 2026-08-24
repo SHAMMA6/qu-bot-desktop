@@ -4,14 +4,14 @@
 <meta charset="utf-8" />
 <meta http-equiv="Content-Security-Policy"
       content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;" />
-<title>QU Bot</title>
+<title>EMoO BOT</title>
 <link rel="stylesheet" href="settings.css" />
 </head>
 <body>
   <header class="hero">
     <div class="hero__preview"><div id="preview"></div></div>
     <div class="hero__meta">
-      <h1 id="heroName">QU Bot</h1>
+      <h1 id="heroName">EMoO BOT</h1>
       <p id="heroSub" data-i18n="app.tagline">A small desktop colleague.</p>
     </div>
   </header>
@@ -193,6 +193,12 @@
       <p class="note" data-i18n="keys.note">It also greets you by time of day.</p>
     </section>
   </main>
+
+  <!-- Sits below the panels rather than inside one, so it is there on every tab. -->
+  <footer class="credit">
+    <p id="creditRights"></p>
+    <p id="creditMade"><strong></strong></p>
+  </footer>
 
   <script type="module" src="settings.js"></script>
 </body>

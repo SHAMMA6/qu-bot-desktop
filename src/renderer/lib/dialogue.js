@@ -415,7 +415,7 @@ export const LINES = {
 // Voice: the user's chosen name plus their personality sliders. Sassiness picks
 // a spikier variant of a line where one exists, so two people's bots read
 // differently without needing two whole scripts.
-const VOICE = { name: 'QU Bot', sassy: 0.5 };
+const VOICE = { name: 'EMoO BOT', sassy: 0.5 };
 
 export function setVoice(next = {}) {
   if (typeof next.name === 'string' && next.name.trim()) VOICE.name = next.name.trim();

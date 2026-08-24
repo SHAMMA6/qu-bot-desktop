@@ -1,4 +1,4 @@
-# QU Bot
+# EMoO BOT
 
 A desktop mascot in the Grok Bot style — a solid vector blob with two expressive
 eyes, no mouth, no outline.
@@ -15,7 +15,7 @@ you have known each other, how many times you have thrown it — and it will
 wait on a spot you choose while you work, count how long you have been heads-down
 in one app, and hold your timers.
 
-![QU Bot](assets/icon.png)
+![EMoO BOT](assets/icon.png)
 
 ---
 
@@ -26,8 +26,8 @@ in one app, and hold your timers.
 
 | File | What it is |
 | --- | --- |
-| `QU-Bot-<version>-Setup.exe` | Installer — Start-menu and desktop shortcuts, and a normal uninstall entry |
-| `QU-Bot-<version>-portable.exe` | One file, no install. Double-click it and the bot appears |
+| `EMoO-BOT-<version>-Setup.exe` | Installer — Start-menu and desktop shortcuts, and a normal uninstall entry |
+| `EMoO-BOT-<version>-portable.exe` | One file, no install. Double-click it and the bot appears |
 
 Nothing else is needed — Node and Electron are bundled inside.
 
@@ -41,6 +41,15 @@ permanently needs a paid code-signing certificate.
 
 Once running it lives in the system tray — right-click the tray icon for
 settings, or press `Ctrl` + `Alt` + `B` to summon it to your cursor.
+
+**It starts with Windows.** That is on out of the box: a desk companion that is
+only there on the days you remember to launch it is not much of a companion. It
+says so once, the first time, and the switch is **Settings → Behaviour → Start
+with Windows** whenever you want it off.
+
+> **Upgrading from QU Bot?** Same app, new name. The installer replaces the old
+> one in place, and your settings, your spot and everything the bot remembers
+> about you are carried across on first run.
 
 ## Running from source
 
@@ -278,7 +287,7 @@ window is focused and where it sits. The window title is used only to notice tha
 something changed; only the coarse kind of app is ever surfaced ("your editor",
 "the browser"), never the title itself. Nothing is written to disk, nothing is
 sent anywhere, and turning the setting off stops the helper entirely. The script
-it runs is written in the clear to `%APPDATA%/QU Bot/activity-watch.ps1` so you
+it runs is written in the clear to `%APPDATA%/EMoO BOT/activity-watch.ps1` so you
 can read exactly what it does.
 
 ## How it behaves on its own
@@ -452,8 +461,8 @@ npx electron . "--shot=out.png,2500" "--shot-rect=0,90,400,330"
 ```
 
 Add `--shot-do-file=<path>` to drive it first — the script runs in the mascot
-window with `window.__qubot` in scope, e.g.
-`window.__qubot.pose({ x: 200, y: 210, emotion: 'love', text: 'hello.' })`.
+window with `window.__emoo` in scope, e.g.
+`window.__emoo.pose({ x: 200, y: 210, emotion: 'love', text: 'hello.' })`.
 With `--dev`, display handoffs are logged as the window moves between monitors.
 
 ## Releasing
@@ -507,7 +516,7 @@ updates switched off, and reports back either way.
 
 Signing the macOS build is the one thing that would move a row in that table from
 No to Yes. It needs a paid Apple Developer account, after which
-`CSC_LINK`/`CSC_KEY_PASSWORD` and `QUBOT_SIGNED=1` in the workflow are enough.
+`CSC_LINK`/`CSC_KEY_PASSWORD` and `EMOO_SIGNED=1` in the workflow are enough.
 
 ## Credits
 
@@ -515,3 +524,5 @@ The character's geometry — 5 body shapes, 25 expression eye-rings, the
 per-shape face-fitting transforms and the gold star — follows the Grok Bot mark
 published at [x.ai](https://x.ai). Everything else here (the emotion system,
 autonomy, physics, effects, dialogue and app shell) is original.
+
+Made For **EMAN MOSTAFA**.

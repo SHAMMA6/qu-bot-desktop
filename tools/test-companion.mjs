@@ -254,7 +254,7 @@ function testUpdateCapability() {
   // Squirrel.Mac verifies the signature before swapping the bundle, so an
   // unsigned build would download an update and then refuse to apply it.
   check(!can({ packaged: true, platform: 'darwin' }), 'unsigned macOS cannot self-update');
-  check(can({ packaged: true, platform: 'darwin', env: { QUBOT_SIGNED: '1' } }),
+  check(can({ packaged: true, platform: 'darwin', env: { EMOO_SIGNED: '1' } }),
     'a signed macOS build should update itself');
 
   check(can({ packaged: true, platform: 'linux', env: { APPIMAGE: '/tmp/QU.AppImage' } }),

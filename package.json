@@ -1,6 +1,6 @@
 {
-  "name": "qu-bot-desktop",
-  "productName": "QU Bot",
+  "name": "emoo-bot-desktop",
+  "productName": "EMoO BOT",
   "version": "1.3.0",
   "description": "A desktop mascot — a living little bot that roams your screen, reacts to you, and has a lot of feelings.",
   "type": "module",
@@ -22,7 +22,7 @@
   },
   "build": {
     "appId": "com.qubot.desktop",
-    "productName": "QU Bot",
+    "productName": "EMoO BOT",
     "files": [
       "src/**/*",
       "assets/**/*",
@@ -35,7 +35,7 @@
         "portable"
       ],
       "icon": "assets/icon.ico",
-      "artifactName": "QU-Bot-${version}-Setup.${ext}"
+      "artifactName": "EMoO-BOT-${version}-Setup.${ext}"
     },
     "nsis": {
       "oneClick": false,
@@ -43,7 +43,7 @@
       "createDesktopShortcut": true
     },
     "portable": {
-      "artifactName": "QU-Bot-${version}-portable.${ext}"
+      "artifactName": "EMoO-BOT-${version}-portable.${ext}"
     },
     "directories": {
       "output": "dist"
@@ -71,10 +71,10 @@
       "category": "Utility"
     },
     "dmg": {
-      "artifactName": "QU-Bot-${version}-mac.${ext}"
+      "artifactName": "EMoO-BOT-${version}-mac.${ext}"
     },
     "appImage": {
-      "artifactName": "QU-Bot-${version}-linux.${ext}"
+      "artifactName": "EMoO-BOT-${version}-linux.${ext}"
     }
   },
   "repository": {

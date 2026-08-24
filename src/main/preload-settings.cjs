@@ -1,6 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-contextBridge.exposeInMainWorld('qubotSettings', {
+contextBridge.exposeInMainWorld('emooSettings', {
   get: () => ipcRenderer.invoke('settings:get'),
   update: (patch) => ipcRenderer.send('settings:update', patch),
   reset: () => ipcRenderer.send('settings:reset'),
