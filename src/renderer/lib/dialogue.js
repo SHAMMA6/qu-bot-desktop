@@ -3,6 +3,7 @@
 
 import { pick } from './geom.js';
 import { AR, AR_SASSY } from './dialogue-ar.js';
+import { EG, EG_SASSY } from './dialogue-eg.js';
 
 // English is the canonical table: every other pack is checked against its keys
 // and its {placeholders} by `npm test`, so a translation can never quietly
@@ -213,6 +214,18 @@ export const LINES = {
     'i like this desktop. good desktop.',
     'somewhere a fan is spinning for us.',
     'take a break at some point. just a thought.',
+    'i have no idea what most of these icons do.',
+    'the cursor never gets tired. i find that suspicious.',
+    'if i had pockets, i would keep things in them.',
+    'do you think the other windows talk about me?',
+    'i have been practising standing still. i am very good at it.',
+    'somewhere out there is a folder you have not opened since 2019.',
+    'i could learn a language. i have the time.',
+    'every so often i think about the recycle bin.',
+    'this is a nice bit of screen. good screen.',
+    'i am not procrastinating, i am idling. different thing.',
+    'the scrollbar knows things.',
+    'one day this will all be a screenshot.',
   ],
 
   compliment: [
@@ -410,6 +423,111 @@ export const LINES = {
   ],
 
   hidden: ['i will be in the tray.', 'call me back anytime.'],
+
+  // ---- side words ----------------------------------------------------------
+  // One or two words, never a sentence. `blurt()` fires these on the small beats
+  // — a poke, a near miss, a landing — where a whole line would be too much
+  // talking. They are what stops a companion from being either silent or a
+  // monologue: most of what anyone says to a colleague all day is this short.
+  sideOw: ['ow.', 'oof.', 'ouch!', 'hey!'],
+  sideHey: ['hey!', 'oi.', 'excuse me.', 'hello?'],
+  sideWow: ['whoa.', 'wow.', 'no way.', 'huh!'],
+  sideYay: ['yes!', 'nice!', 'got it!', 'ha!'],
+  sideUgh: ['ugh.', 'seriously.', 'great.', 'sure.'],
+  sideHmm: ['hmm.', 'huh.', 'well.', 'so...'],
+  sideHeh: ['heh.', 'ha.', 'ok that is funny.'],
+  sideOops: ['oops.', 'my bad.', 'ignore that.'],
+  sideYes: ['yep.', 'ok.', 'sure.', 'right.'],
+  sideNo: ['nope.', 'no.', 'not that.'],
+  sideHuh: ['huh?', 'sorry?', 'what?'],
+  sideAww: ['aww.', 'oh.', 'that is nice.'],
+
+  // ---- the newer ways you can bother it ------------------------------------
+  hug: [
+    'oh. a hug. ok.',
+    'this is... genuinely fine.',
+    'i will stay right here.',
+    'your cursor is warm. odd.',
+  ],
+  clickStorm: [
+    'stop. stop!',
+    'i am not a button.',
+    'enough! honestly.',
+    'we talked about this.',
+  ],
+  stare: [
+    'fine. eye contact.',
+    'i am not blinking first.',
+    'i do not blink. try me.',
+  ],
+  stareLost: [
+    'fine, i blinked. congratulations.',
+    'you win. happy?',
+    'my eyes are dry. you win.',
+  ],
+  shaken: [
+    'why are you shaking me?',
+    'everything inside me just moved.',
+    'stop! stop!',
+    'i am not a cocktail.',
+  ],
+  spun: [
+    'why are you circling me?',
+    'you are making me dizzy on purpose.',
+    'round and round. thanks.',
+  ],
+  flinchNear: [
+    'whoa!',
+    'that nearly got me.',
+    'careful with that thing.',
+  ],
+  hoverNear: [
+    'i can see you there.',
+    'did you need something?',
+    'come closer, i do not bite.',
+    'yes? i am right here.',
+  ],
+  trick: [
+    'watch this.',
+    'check this out.',
+    'observe.',
+    'again? go on then.',
+  ],
+  wakePoke: [
+    'i was asleep!',
+    'what — i was mid-dream.',
+    'why would you do that.',
+  ],
+  highfive: [
+    'up top!',
+    'there it is.',
+    'nailed it.',
+  ],
+  peekaboo: [
+    'boo!',
+    'gone — no, back.',
+    'did that work?',
+  ],
+  sneeze: [
+    'ahh— sorry.',
+    'hatchoo. there is no dust in here.',
+    'that was a sneeze, not an error.',
+  ],
+  hiccup: [
+    'hic — sorry.',
+    'hiccups. i have no idea either.',
+    'hold on. hic. moment.',
+  ],
+  dance: [
+    'put something on, i am ready.',
+    'i have got rhythm. somewhere.',
+    'do not stop me now.',
+  ],
+  resize: [
+    'roomier.',
+    'this size works.',
+    'fine. i am flexible.',
+  ],
 };
 
 // Voice: the user's chosen name plus their personality sliders. Sassiness picks
@@ -453,6 +571,7 @@ export const SASSY = {
 export const PACKS = {
   en: { lines: LINES, sassy: SASSY },
   ar: { lines: AR, sassy: AR_SASSY },
+  eg: { lines: EG, sassy: EG_SASSY },
 };
 
 export const LANGUAGES = Object.keys(PACKS);
@@ -478,6 +597,22 @@ export const say = (key, vars) => {
     : (pack.lines[key] || LINES[key] || LINES.idleMusing);
   return fill(pick(pool), vars);
 };
+
+// The side-word buckets, named by the beat they suit rather than by bucket key,
+// so a call site reads `side('ow')` instead of remembering the table. Kept as an
+// explicit map rather than built from the string, because a typo in a computed
+// key would silently fall through to English and nobody would notice.
+export const SIDE = {
+  ow: 'sideOw', hey: 'sideHey', wow: 'sideWow', yay: 'sideYay',
+  ugh: 'sideUgh', hmm: 'sideHmm', heh: 'sideHeh', oops: 'sideOops',
+  yes: 'sideYes', no: 'sideNo', huh: 'sideHuh', aww: 'sideAww',
+};
+
+export const SIDE_KINDS = Object.keys(SIDE);
+
+// One or two words, in the current pack. Used for the beats too small to spend
+// a sentence on.
+export const side = (kind) => say(SIDE[kind] || SIDE.hmm);
 
 // The bond line for a level, if that level has anything new to say.
 export const bondLine = (level, vars) => {

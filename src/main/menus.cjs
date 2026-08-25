@@ -68,6 +68,14 @@ function coatMenu(settings, onSetting, onSettings) {
     checked: settings.coat === 'custom',
     click: () => { onSetting({ coat: 'custom' }); onSettings(); },
   });
+  // A gradient cannot be picked from a menu — it is three colours and an angle —
+  // so this switches it on and opens the window where it can be edited.
+  items.push({
+    label: tr('menu.gradient'),
+    type: 'radio',
+    checked: settings.coat === 'gradient',
+    click: () => { onSetting({ coat: 'gradient' }); onSettings(); },
+  });
   return items;
 }
 
@@ -157,6 +165,7 @@ const TOGGLES = [
   { key: 'gravity' },
   { key: 'roam' },
   { key: 'chatter' },
+  { key: 'gestures' },
   { key: 'sleepWhenIdle' },
   { key: 'nudges' },
   { key: 'gazeFollowsCursor' },
@@ -216,6 +225,10 @@ function commonSections(o) {
     onTimer, onCancelTimer, onPomodoro, onShelf } = o;
   const held = shelf || [];
   return [
+    // The one thing in either menu that asks it to *do* something rather than
+    // to be something. Everything else it performs, it performs on its own.
+    { label: tr('menu.trick'), enabled: !!settings.gestures, click: () => onCommand('trick') },
+    { type: 'separator' },
     { label: tr('menu.shape'), submenu: shapeMenu(settings, onSetting) },
     { label: tr('menu.colour'), submenu: coatMenu(settings, onSetting, onSettings) },
     { label: tr('menu.size'), submenu: sizeMenu(settings, onSetting) },

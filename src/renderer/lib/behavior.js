@@ -248,6 +248,58 @@ export class Brain {
 
     w(3, () => this.emit({ type: 'emotion', key: pick(['lookLeft', 'lookRight', 'lookUp', 'lookDown']) }));
     w(2, () => this.emit({ type: 'emotion', key: 'curious' }));
+
+    // ---- gestures it performs unprompted -----------------------------------
+    // A feeling it merely wears is a face; a feeling it acts out is a
+    // character. These ask for a *kind* of gesture rather than a named one, so
+    // the choreography table can grow without this function knowing.
+    w(1.8 + this.mood * 2, () => {
+      this.emit({ type: 'emotion', key: pick(['happy', 'delighted', 'beaming', 'playful']) });
+      this.emit({ type: 'moveTag', tag: pick(['happy', 'play']) });
+    });
+    w(this.energy * 1.6, () => {
+      this.emit({ type: 'emotion', key: pick(['excited', 'giddy', 'grooving']) });
+      this.emit({ type: 'moveTag', tag: pick(['show', 'dance']) });
+    });
+    w(this.boredom * 2.2, () => {
+      this.emit({ type: 'emotion', key: pick(['bored', 'waiting', 'moping']) });
+      this.emit({ type: 'moveTag', tag: 'idle' });
+    });
+    w((1 - this.energy) * 1.8, () => {
+      this.emit({ type: 'emotion', key: pick(['sleepy', 'drained', 'yawning']) });
+      this.emit({ type: 'moveTag', tag: 'tired' });
+    });
+    w(1.2 * (0.4 + sassy), () => {
+      this.emit({ type: 'emotion', key: pick(['teasing', 'mischievous', 'sarcastic', 'gloating']) });
+      this.emit({ type: 'moveTag', tag: pick(['sassy', 'sneaky']) });
+    });
+    w(1.1, () => this.emit({ type: 'moveTag', tag: 'calm' }));
+    // Travelling gestures need open air, so they are worth far more when it is
+    // flying and worth nothing at all when it is parked on a surface.
+    w(ctx.flying && this.enabled.roam ? 1.6 * (0.5 + this.energy) : 0, () => {
+      this.emit({ type: 'emotion', key: pick(['excited', 'playful', 'determined']) });
+      this.emit({ type: 'moveTag', tag: 'travel' });
+    });
+    // The small ordinary noises a body makes. Rare on purpose: a bot that
+    // sneezes often is a bot with a problem.
+    w(0.5, () => {
+      const bit = pick(['sneeze', 'hiccup', 'stretch', 'yawn']);
+      if (bit === 'sneeze') {
+        this.emit({ type: 'emotion', key: 'sneezing' });
+        this.emit({ type: 'move', key: 'sneeze' });
+        if (this.mayChatter(0.5)) this.emit({ type: 'say', text: say('sneeze'), delay: 1.1 });
+      } else if (bit === 'hiccup') {
+        this.emit({ type: 'emotion', key: 'hiccuping' });
+        this.emit({ type: 'move', key: 'hiccup' });
+        if (this.mayChatter(0.4)) this.emit({ type: 'say', text: say('hiccup'), delay: 1 });
+      } else if (bit === 'stretch') {
+        this.emit({ type: 'emotion', key: 'stretching' });
+        this.emit({ type: 'move', key: 'stretchTall' });
+      } else {
+        this.emit({ type: 'emotion', key: 'yawning' });
+        this.emit({ type: 'move', key: 'yawnBig' });
+      }
+    });
     w(1.4 + this.boredom * 3, () => {
       this.emit({ type: 'emotion', key: 'bored' });
       if (this.mayChatter(0.6)) this.emit({ type: 'say', text: say('bored'), delay: 0.5 });
@@ -259,17 +311,22 @@ export class Brain {
     w(this.mood * 2.4, () => this.emit({ type: 'emotion', key: pick(['happy', 'content', 'wink']) }));
 
     // The wider roster. All of it is reached by weight from here rather than by
-    // being picked off a menu, so which of the 78 you ever see is a function of
+    // being picked off a menu, so which of the 131 you ever see is a function of
     // mood, energy, boredom and personality — not of what you clicked.
-    w(this.mood * 1.5, () => this.emit({ type: 'emotion', key: pick(['cozy', 'zen', 'humming', 'grateful']) }));
-    w(this.mood * 1.2 * (0.4 + sassy), () =>
-      this.emit({ type: 'emotion', key: pick(['playful', 'mischievous', 'smug', 'vindicated']) }));
-    w(1.3, () => this.emit({ type: 'emotion', key: pick(['daydreaming', 'searching', 'suspicious', 'hopeful']) }));
-    w(this.boredom * 1.8, () => this.emit({ type: 'emotion', key: pick(['stretching', 'yawning', 'hungry']) }));
-    w((1 - this.mood) * 1.2, () =>
-      this.emit({ type: 'emotion', key: pick(['sulking', 'lonely', 'apologetic', 'nervous']) }));
-    w(this.affection * 1.4, () => this.emit({ type: 'emotion', key: pick(['starstruck', 'impressed', 'waving']) }));
-    w(this.energy > 0.7 ? 1.2 : 0, () => this.emit({ type: 'emotion', key: pick(['determined', 'grooving']) }));
+    w(this.mood * 1.5, () =>
+      this.emit({ type: 'emotion', key: pick(['cozy', 'zen', 'humming', 'grateful', 'beaming', 'singing']) }));
+    w(this.mood * 1.2 * (0.4 + sassy), () => this.emit({ type: 'emotion',
+      key: pick(['playful', 'mischievous', 'smug', 'vindicated', 'teasing', 'gloating', 'sarcastic']) }));
+    w(1.3, () => this.emit({ type: 'emotion', key: pick(['daydreaming', 'searching', 'suspicious', 'hopeful',
+      'pondering', 'stargazing', 'wistful', 'inspecting', 'plotting', 'counting']) }));
+    w(this.boredom * 1.8, () => this.emit({ type: 'emotion',
+      key: pick(['stretching', 'yawning', 'hungry', 'waiting', 'tidying', 'juggling', 'snacking']) }));
+    w((1 - this.mood) * 1.2, () => this.emit({ type: 'emotion',
+      key: pick(['sulking', 'lonely', 'apologetic', 'nervous', 'moping', 'disappointed', 'guilty', 'wistful']) }));
+    w(this.affection * 1.4, () => this.emit({ type: 'emotion',
+      key: pick(['starstruck', 'impressed', 'waving', 'adoring', 'touched', 'highfiving']) }));
+    w(this.energy > 0.7 ? 1.2 : 0, () => this.emit({ type: 'emotion',
+      key: pick(['determined', 'grooving', 'drumming', 'exercising', 'caffeinated']) }));
 
     w(this.affection * 2 * (0.5 + clingy), () => {
       this.emit({ type: 'emotion', key: 'love' });

@@ -14,8 +14,20 @@ const DEFAULTS = {
   name: 'EMoO BOT',
   // 'auto' follows the system locale; 'en' / 'ar' pin it.
   language: 'auto',
+  // Which pack it SPEAKS from, kept separate from the language of the menus.
+  // 'auto' follows the interface language; 'eg' is Egyptian Arabic mixed with
+  // English, which is a voice rather than a locale — there is no interface
+  // translation for it, and nobody wants their menus written that way.
+  voice: 'auto',
   coat: 'chalk',
   customCoat: '#885CF5',
+  // A gradient coat: three stops and an angle in degrees, 0 running left to
+  // right. Only painted when `coat` is 'gradient', but kept whatever the coat
+  // is, so switching away and back does not lose the colours you picked.
+  gradient: { colors: ['#3C82F6', '#885CF5', '#EB4699'], angle: 135 },
+  // Colour glow, 0..1. Off by default: a desk pet that arrives radiating light
+  // is a lava lamp, and this should be something you choose to switch on.
+  glow: 0,
   shape: 'circle',
   size: 128,
   opacity: 1,
@@ -25,6 +37,7 @@ const DEFAULTS = {
   watchActivity: true,   // notice which app is in front (see awareness.cjs)
   rideWindows: true,     // perch on the title bar and ride it when it moves
   chatter: true,
+  gestures: true,        // acts its feelings out, rather than only wearing them
   sleepWhenIdle: true,
   nudges: true,
   gazeFollowsCursor: true,
@@ -153,6 +166,19 @@ class Store {
     if (typeof d.customCoat !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(d.customCoat)) {
       d.customCoat = DEFAULTS.customCoat;
     }
+
+    // The gradient is the only nested object a user can edit, so it is the only
+    // one that can arrive here half-written — three stops are required, and a
+    // missing one falls back rather than painting the body with `undefined`.
+    d.glow = num(d.glow, 0, 1, DEFAULTS.glow);
+    const hex = (v, fallback) =>
+      (typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v) ? v : fallback);
+    const src = d.gradient && typeof d.gradient === 'object' ? d.gradient : {};
+    const stops = Array.isArray(src.colors) ? src.colors : [];
+    d.gradient = {
+      colors: DEFAULTS.gradient.colors.map((fallback, i) => hex(stops[i], fallback)),
+      angle: Math.round(((num(src.angle, -3600, 3600, DEFAULTS.gradient.angle) % 360) + 360) % 360),
+    };
     // A name is shown in speech bubbles and menus, so cap it and strip control
     // characters rather than trusting whatever ends up in the file.
     d.name = [...String(d.name ?? DEFAULTS.name)]
@@ -162,6 +188,7 @@ class Store {
       .slice(0, 24) || DEFAULTS.name;
 
     if (!['auto', 'en', 'ar'].includes(d.language)) d.language = 'auto';
+    if (!['auto', 'en', 'ar', 'eg'].includes(d.voice)) d.voice = 'auto';
 
     if (d.home && typeof d.home === 'object' && Number.isFinite(Number(d.home.x))
         && Number.isFinite(Number(d.home.y))) {
@@ -170,7 +197,7 @@ class Store {
       d.home = null;
     }
 
-    for (const k of ['gravity', 'roam', 'chatter', 'sleepWhenIdle', 'nudges',
+    for (const k of ['gravity', 'roam', 'chatter', 'gestures', 'sleepWhenIdle', 'nudges',
       'gazeFollowsCursor', 'alwaysOnTop', 'soundEnabled', 'launchOnLogin', 'greetOnLaunch',
       'followCursor', 'watchActivity', 'rideWindows', 'machineAware',
       'focusReports', 'autoUpdate', 'homeWhenBusy', 'focusMode', 'startupNoticeShown']) {

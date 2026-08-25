@@ -10,7 +10,7 @@
     "dev": "electron . --dev",
     "build": "electron-builder --win",
     "pack": "electron-builder --win --dir",
-    "test": "node tools/validate.mjs && node tools/test-displays.mjs && node tools/test-attention.mjs && node tools/test-companion.mjs",
+    "test": "node tools/validate.mjs && node tools/test-displays.mjs && node tools/test-attention.mjs && node tools/test-companion.mjs && node tools/test-gestures.mjs",
     "icons": "node tools/make-icons.cjs",
     "release": "node tools/release.mjs"
   },

@@ -41,7 +41,20 @@ body {
   padding: 22px 22px 16px;
 }
 
+/* The preview glows exactly as the real one does, so the Glow slider shows its
+   own effect instead of asking you to go and look at the desktop. */
+.hero__preview::before {
+  content: '';
+  position: absolute;
+  inset: -46%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, var(--glow-core) 0%, var(--glow-mid) 38%, transparent 70%);
+  opacity: var(--glow-strength, 0);
+  pointer-events: none;
+}
+
 .hero__preview {
+  position: relative;
   width: 76px;
   height: 76px;
   flex: none;
@@ -169,6 +182,15 @@ h2 {
 .row--slider input[type=range] { flex: 1; accent-color: var(--accent); }
 .row output { min-width: 46px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
 input[type=color] { width: 44px; height: 26px; border: 1px solid var(--line); border-radius: 6px; background: none; cursor: pointer; }
+
+/* The three gradient stops, side by side so they read as one gradient rather
+   than as three unrelated colour pickers. */
+.stops { display: flex; gap: 6px; }
+.stops input[type=color] { width: 38px; }
+
+/* A gradient swatch shows the actual gradient, so picking one is a matter of
+   looking rather than of reading eight names. */
+.swatch--grad { width: 46px; border-radius: 10px; }
 
 /* ---------------------------------------------------------- toggles */
 .toggle {

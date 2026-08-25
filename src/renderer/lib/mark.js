@@ -1,9 +1,14 @@
-// The mascot's body: one solid silhouette plus two eye shapes clipped to it.
-// No mouth, no outline, no gradients — the whole character reads through eye
-// geometry and body language, which is what keeps the silhouette this clean.
+// The mascot's body: one silhouette plus two eye shapes clipped to it. No mouth
+// and no outline — the whole character reads through eye geometry and body
+// language, which is what keeps the silhouette this clean.
+//
+// The fill may be flat or a three-stop gradient. That is the one concession, and
+// it is a safe one: a gradient changes what the shape is painted with, never
+// what the shape is, so the silhouette stays exactly as readable.
 
 import DATA from '../../shared/mascot-data.js';
 import { ringPath, centroid, clamp } from './geom.js';
+import { gradientVector } from '../../shared/themes.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const HEAD_C = DATA.HEAD_C;
@@ -341,7 +346,11 @@ export class Mark {
   constructor(container) {
     this.shapeKey = SHAPE_KEYS[0];
     this.shape = DATA.shapes[this.shapeKey];
+    // Ids are per-instance: the settings window renders a second Mark beside the
+    // real one, and two elements sharing a clip id is a rendering coin toss.
     this.clipId = `head-clip-${++clipSeq}`;
+    this.gradId = `coat-grad-${clipSeq}`;
+    this.grad = null;
 
     const svg = el('svg', {
       class: 'mark',
@@ -351,6 +360,7 @@ export class Mark {
     });
 
     const defs = el('defs');
+    this.defs = defs;
     this.clipPath = el('clipPath', { id: this.clipId });
     this.clipShape = el('path', { d: this.shape.path });
     this.clipPath.appendChild(this.clipShape);
@@ -427,8 +437,28 @@ export class Mark {
     }
   }
 
-  setColors({ coat, ink }) {
-    this.head.style.fill = coat;
+  // A flat coat is one fill. A gradient is a `<linearGradient>` in this mark's
+  // own defs — built once, then only its stops and angle are touched, because
+  // rebuilding the node would make the paint flicker on every settings keystroke
+  // while someone is dragging a colour picker.
+  setColors({ coat, ink, gradient }) {
+    if (gradient) {
+      if (!this.grad) {
+        this.grad = el('linearGradient', { id: this.gradId, gradientUnits: 'objectBoundingBox' });
+        this.gradStops = gradient.colors.map((_, i) => {
+          const stop = el('stop', { offset: `${(i / (gradient.colors.length - 1)) * 100}%` });
+          this.grad.appendChild(stop);
+          return stop;
+        });
+        this.defs.appendChild(this.grad);
+      }
+      gradient.colors.forEach((c, i) => this.gradStops[i]?.setAttribute('stop-color', c));
+      const v = gradientVector(gradient.angle);
+      for (const [k, n] of Object.entries(v)) this.grad.setAttribute(k, n.toFixed(4));
+      this.head.style.fill = `url(#${this.gradId})`;
+    } else {
+      this.head.style.fill = coat;
+    }
     this.eyes.forEach((e) => (e.style.fill = ink));
   }
 

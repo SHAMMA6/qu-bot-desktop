@@ -4,7 +4,7 @@
 import DATA from '../shared/mascot-data.js';
 import { Mark, SHAPE_KEYS, ACCESSORY_GROUPS } from './lib/mark.js';
 import { EMOTIONS, PREVIEW_REEL } from './lib/emotions.js';
-import { COATS, resolveCoat } from '../shared/themes.js';
+import { COATS, GRADIENTS, resolveCoat, inkForGradient, rgba } from '../shared/themes.js';
 import { centroid, ringPath, clamp, TAU, approach, rand } from './lib/geom.js';
 import { t as translate, isRTL, LANGUAGES } from '../shared/i18n.js';
 
@@ -120,9 +120,48 @@ function buildCoats() {
   });
 }
 
+// The gradient controls. Picking a preset selects the gradient coat as well —
+// clicking a gradient and having nothing happen because a different coat is
+// still selected would be a puzzle, not a feature.
+const cssGradient = (colors, angle = 135) =>
+  `linear-gradient(${angle + 90}deg, ${colors.join(', ')})`;
+
+function buildGradients() {
+  $('gradientGrid').innerHTML = GRADIENTS.map((g) => `
+    <button class="swatch swatch--grad" data-gradient="${g.key}" title="${t(`gradient.${g.key}`)}"
+            style="background:${cssGradient(g.colors)}"></button>`).join('');
+
+  bindOnce('gradientGrid', () => {
+    $('gradientGrid').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-gradient]');
+      if (!btn) return;
+      const preset = GRADIENTS.find((g) => g.key === btn.dataset.gradient);
+      if (preset) api.update({ coat: 'gradient', gradient: { colors: [...preset.colors], angle: currentAngle() } });
+    });
+
+    // Editing a stop or the angle also switches the coat over, for the same
+    // reason: the control you just used should be the one that takes effect.
+    $('gradientStops').addEventListener('input', (e) => {
+      const input = e.target.closest('[data-stop]');
+      if (!input) return;
+      const colors = [...$$('#gradientStops [data-stop]')].map((i) => i.value);
+      api.update({ coat: 'gradient', gradient: { colors, angle: currentAngle() } });
+    });
+
+    $('gradientAngle').addEventListener('input', () => {
+      $('gradientAngleOut').textContent = `${currentAngle()}°`;
+      const colors = [...$$('#gradientStops [data-stop]')].map((i) => i.value);
+      api.update({ coat: 'gradient', gradient: { colors, angle: currentAngle() } });
+    });
+  });
+}
+
+const currentAngle = () => Number($('gradientAngle').value) || 0;
+const $$ = (sel) => document.querySelectorAll(sel);
+
 const TOGGLES = [
   'followCursor', 'watchActivity', 'rideWindows', 'homeWhenBusy', 'focusReports',
-  'machineAware', 'autoUpdate', 'roam', 'gravity', 'chatter', 'sleepWhenIdle',
+  'machineAware', 'autoUpdate', 'roam', 'gravity', 'chatter', 'gestures', 'sleepWhenIdle',
   'nudges', 'gazeFollowsCursor', 'soundEnabled', 'alwaysOnTop', 'greetOnLaunch',
   'launchOnLogin',
 ];
@@ -285,6 +324,27 @@ function buildLanguages() {
   });
 }
 
+// How it talks, which is not the same choice as which language the menus are in.
+// Egyptian is a voice rather than a locale — colloquial, mixed with English —
+// so it appears here and never in the language list.
+const VOICES = [
+  { key: 'auto', i18n: 'voice.auto' },
+  { key: 'en', native: 'English' },
+  { key: 'ar', native: 'العربية' },
+  { key: 'eg', native: 'مصري + English' },
+];
+
+function buildVoices() {
+  $('voicePicker').innerHTML = VOICES
+    .map((v) => `<button data-voice="${v.key}">${v.i18n ? t(v.i18n) : v.native}</button>`).join('');
+  bindOnce('voicePicker', () => {
+    $('voicePicker').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-voice]');
+      if (btn) api.update({ voice: btn.dataset.voice });
+    });
+  });
+}
+
 // Everything with a key in the markup, plus the direction of the whole window.
 // Called once at boot and again whenever main tells us the language changed —
 // the built lists are rebuilt rather than patched, because their labels are
@@ -304,10 +364,12 @@ function applyLanguage(next) {
 
   buildShapes();
   buildCoats();
+  buildGradients();
   buildToggles();
   buildAccessories();
   buildCorners();
   buildLanguages();
+  buildVoices();
   buildQuickTimerLabels();
   renderCredit();
   if (settings) render(settings);
@@ -412,15 +474,48 @@ function buildBond() {
 // ---------------------------------------------------------------- sync
 function render(next) {
   settings = next;
-  const { coat, ink } = resolveCoat(next.coat, next.customCoat);
-  document.documentElement.style.setProperty('--coat', coat);
-  document.documentElement.style.setProperty('--ink', ink);
+  const { coat, ink, gradient } = resolveCoat(next.coat, next.customCoat, next.gradient);
+  const root = document.documentElement.style;
+  root.setProperty('--coat', coat);
+  root.setProperty('--ink', ink);
+  // The preview glows the way the real one does, so the slider demonstrates
+  // itself rather than sending you off to look at the desktop.
+  const stops = gradient ? gradient.colors : [coat, coat];
+  root.setProperty('--glow-core', rgba(stops[stops.length - 1], 0.6));
+  root.setProperty('--glow-mid', rgba(stops[0], 0.26));
+  root.setProperty('--glow-strength', String(next.glow ?? 0));
+  preview.setColors({ coat, ink, gradient });
   preview.setShape(next.shape);
 
   document.querySelectorAll('[data-shape]').forEach((b) =>
     b.classList.toggle('is-on', b.dataset.shape === next.shape));
   document.querySelectorAll('[data-coat]').forEach((b) =>
     b.classList.toggle('is-on', b.dataset.coat === next.coat));
+  // A gradient preset is "on" when the coat is a gradient AND its colours are
+  // the ones showing — otherwise every preset would look selected the moment
+  // you nudged one stop away from it.
+  const g = next.gradient || {};
+  const wornGradient = next.coat === 'gradient' ? (g.colors || []).join(',').toLowerCase() : '';
+  document.querySelectorAll('[data-gradient]').forEach((b) => {
+    const preset = GRADIENTS.find((p) => p.key === b.dataset.gradient);
+    b.classList.toggle('is-on', !!preset && preset.colors.join(',').toLowerCase() === wornGradient);
+  });
+  document.querySelectorAll('#gradientStops [data-stop]').forEach((i, n) => {
+    if (document.activeElement !== i) i.value = (g.colors || [])[n] || '#000000';
+  });
+  if (document.activeElement !== $('gradientAngle')) $('gradientAngle').value = g.angle ?? 135;
+  $('gradientAngleOut').textContent = `${g.angle ?? 135}°`;
+
+  // Warn only when it actually matters: a gradient no eye colour survives.
+  const worst = (g.colors || []).length ? inkForGradient(g.colors).ratio : 99;
+  $('gradientNote').textContent = next.coat === 'gradient' && worst < 3
+    ? t('look.gradientFaint')
+    : t('look.gradientNote');
+
+  document.querySelectorAll('[data-lang]').forEach((b) =>
+    b.classList.toggle('is-on', b.dataset.lang === (next.language || 'auto')));
+  document.querySelectorAll('[data-voice]').forEach((b) =>
+    b.classList.toggle('is-on', b.dataset.voice === (next.voice || 'auto')));
   document.querySelectorAll('[data-key]').forEach((i) => { i.checked = !!next[i.dataset.key]; });
 
   $('customCoat').value = next.customCoat;
@@ -466,7 +561,7 @@ function render(next) {
       : t('home.focusOnly', xy);
 }
 
-const PERCENT_SLIDERS = ['chatty', 'clingy', 'sassy', 'grabResponse', 'volume'];
+const PERCENT_SLIDERS = ['chatty', 'clingy', 'sassy', 'grabResponse', 'volume', 'glow'];
 
 for (const key of PERCENT_SLIDERS) {
   $(key).addEventListener('input', (e) => {

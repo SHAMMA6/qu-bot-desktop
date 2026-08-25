@@ -2,6 +2,8 @@
   --font: 'Segoe UI Variable Display', 'Segoe UI', system-ui, -apple-system, sans-serif;
   --coat: #f7f7f5;
   --ink: #0e0e12;
+  --glow-core: rgba(136, 92, 245, 0.55);
+  --glow-mid: rgba(136, 92, 245, 0.22);
   --bubble-bg: rgba(255, 255, 255, 0.97);
   --bubble-fg: #14141a;
   --bubble-border: rgba(0, 0, 0, 0.09);
@@ -50,6 +52,26 @@ html, body {
   margin-top: -10px;
   border-radius: 50%;
   background: radial-gradient(closest-side, rgba(0, 0, 0, 0.34), rgba(0, 0, 0, 0));
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+/* ---- colour glow ----
+   Sits behind the body and breathes with it. Two stops so a gradient coat
+   shines in more than one colour; for a flat coat both are the same hue at
+   different strengths, which just reads as a soft halo. */
+#glow {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: calc(var(--size) * 2.4);
+  height: calc(var(--size) * 2.4);
+  margin-left: calc(var(--size) * -1.2);
+  margin-top: calc(var(--size) * -1.2);
+  border-radius: 50%;
+  background: radial-gradient(closest-side,
+    var(--glow-core) 0%, var(--glow-mid) 38%, transparent 70%);
+  opacity: 0;
   pointer-events: none;
   will-change: transform, opacity;
 }

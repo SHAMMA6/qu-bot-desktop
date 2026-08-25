@@ -70,22 +70,43 @@ npm run build
 
 ## What it does
 
-**78 emotions**, each a complete performance rather than just a face — its own eye
+**131 emotions**, each a complete performance rather than just a face — its own eye
 geometry, breathing rate, posture, lean, blink rhythm, eyelid droop, gaze
 behaviour, jitter and particle effect.
 
 | Group | Emotions |
 | --- | --- |
-| Everyday | idle, neutral, happy, content, listening, talking, cosy, zen |
-| Delighted | excited, smitten, laughing, celebrating, proud, smug, wink, shy, grateful, hopeful, starstruck, triumphant, cheering, relieved, playful, up to something |
-| Attentive | curious, confused, thinking, focused, working, alert, reading, typing along, searching, determined, suspicious, daydreaming |
-| Startled | surprised, shocked, scared, dizzy, amazed, impressed, wrong way |
-| Low | sad, pleading, bored, sleepy, asleep, where did you go, sulking, sorry, yawning |
-| Spiky | annoyed, angry, skeptical, glitched, not having it, told you, nervous, embarrassed, glitching |
-| Doing something | grooving, humming, stretching, waving, taking a picture |
-| The room | chilly, overheated, peckish |
+| Everyday | idle, neutral, happy, content, listening, talking, cosy, zen, blank, waiting |
+| Delighted | excited, smitten, laughing, celebrating, proud, smug, wink, shy, grateful, hopeful, starstruck, triumphant, cheering, relieved, playful, up to something, giggling, beaming, delighted, adoring, flirty, touched, giddy, teasing, gloating, high five |
+| Attentive | curious, confused, thinking, focused, working, alert, reading, typing along, searching, determined, suspicious, daydreaming, plotting, calculating, eureka, pondering, inspecting, eavesdropping, counting, buffering |
+| Startled | surprised, shocked, scared, dizzy, amazed, impressed, wrong way, spooked, paranoid, panicking, cringing, flustered, queasy |
+| Low | sad, pleading, bored, sleepy, asleep, where did you go, sulking, sorry, yawning, heartbroken, disappointed, guilty, wistful, drained, moping |
+| Spiky | annoyed, angry, skeptical, glitched, not having it, told you, nervous, embarrassed, glitching, grumpy, furious, offended, jealous, betrayed, unimpressed, sarcastic, defiant, stubborn |
+| Doing something | grooving, humming, stretching, waving, taking a picture, singing, drumming, juggling, working out, tidying up, stargazing, snacking, sneaking, spying, sneezing, hiccups |
+| The room | chilly, overheated, peckish, caffeinated |
 | Glances | look left / right / up / down, peeking |
 | Physical | held, falling, squished, walking |
+
+**73 gestures**, layered on top. An emotion is a steady state — a face plus a
+breathing rhythm it can hold all day. A gesture is a beat: a nod, a backflip, a
+sneeze, a lap of the monitor. They are separate layers on purpose, because
+"annoyed" and "stomping" are not the same kind of thing, and folding them
+together would mean a copy of every emotion for every gesture.
+
+| Kind | Gestures |
+| --- | --- |
+| Answers | nod, slow nod, head shake, tilt, double take, lean, peer, bow, wave, shrug, point |
+| Delight | bounce, hop, wiggle, shimmy, groove, headbang, twirl, spin, barrel roll, backflip, frontflip, cartwheel, coin flip, breakdance, moonwalk, celebrate, applaud, heartbeat, nuzzle, hide behind blush, show off |
+| Startle | flinch, jolt, recoil, jump, shiver, vibrate, glitch jump |
+| Spiky | stomp, fume, huff, turn away, sulk, facepalm, eye roll, dodge |
+| Body | stretch, pancake, inflate, jelly, pop, drill, tumble, pendulum, bobble, sneeze, hiccup, nod off, yawn, melt, hypnotised |
+| Travel | circle, figure eight, zigzag, swoop, spiral up, pounce, scurry, retreat, lap of honour, tiptoe, peekaboo |
+
+Getting angry *does* something rather than merely looking like something. Some
+gestures are pure pose; the travelling ones fly the body along a real path across
+the desktop. Every one of them ends by releasing whatever pose it was holding
+over a fifth of a second, so nothing ever snaps back to neutral — there is a test
+that proves it, and it proves itself against a deliberately broken gesture.
 
 ![The 25 expression eye-rings](assets/emotions.png)
 
@@ -113,11 +134,50 @@ cloud alike, and so does everything it is wearing.
 **11 coats** plus any custom colour. The eye colour is derived from the coat's
 luminance, so a custom colour never produces unreadable eyes.
 
+**Gradients.** A coat can instead be three colours and an angle, painted across
+the whole body — eight presets (Sunset, Ocean, Grape, Aurora, Candy, Ember,
+Lagoon, Orchid) or your own three, turned to any angle.
+
+That makes the eye colour a harder question than it looks. The eyes sit on one
+part of the body, but *which* part moves with the shape, the expression and
+where it happens to be looking — so there is no single background colour to
+contrast against. The rule is to pick whichever ink reads best against the
+**worst** stop, which is the only choice that cannot be ambushed by the bot
+glancing somewhere new. `npm test` holds every preset to 3:1 against all three
+of its stops, and the settings window says so plainly when three colours you
+picked yourself are too far apart in brightness for any eye colour to survive.
+
+**Glow.** Off by default; turn it up and it shines in its own colour, breathing
+on the same wave the body does — so it reads as the bot glowing rather than as a
+lamp pointed at it, and it swells when it is excited. A gradient shines in two of
+its own colours. It is a composited sibling behind the body rather than a filter
+on it, because a drop-shadow filter would re-rasterise the whole mark every frame
+the eyes move.
+
 **English and Arabic**, covering the menus, the settings window and everything
-it says — 319 interface strings and 73 buckets of dialogue in each, with the
-settings window laid out right-to-left in Arabic. *Automatic* follows your
-system locale. A missing string, or a translated line that drops one of its
-placeholders, fails **npm test** rather than showing up in front of a reader.
+it says — 393 interface strings in each, with the settings window laid out
+right-to-left in Arabic. *Automatic* follows your system locale. A missing
+string, or a translated line that drops one of its placeholders, fails
+**npm test** rather than showing up in front of a reader.
+
+**Three voices, 101 buckets of dialogue each.** How it talks is a separate
+choice from what language the menus are in, under **Settings → Look → Voice**:
+
+| Voice | |
+| --- | --- |
+| English | 351 lines. Lowercase, dry, a colleague rather than a puppy |
+| العربية | 318 lines of Modern Standard Arabic — correct, a little formal |
+| مصري + English | 374 lines of Egyptian, code-switched with English the way people actually type: «الـbuild عدى، كله tamam» |
+
+Egyptian is a voice rather than a locale, which is why it lives here and not in
+the language list: nobody wants their menus written that way, but plenty of
+people want to be talked to like that. The words that stay in English are the
+ones that live in English — build, tab, terminal, battery, break, timer.
+
+Alongside the sentences are **side words**: one- or two-syllable interjections
+(«آي!», «يا نهار!», "oof.", "heh.") for the beats far too small to spend a
+sentence on — a poke, a near miss, a landing. Most of what anyone says to a
+colleague all day is that short.
 
 ## It remembers you
 
@@ -202,7 +262,13 @@ See [How it feels in the hand](#how-it-feels-in-the-hand).
 
 **Sound** is synthesised at runtime — there are no audio files in the build.
 Each emotion group has its own timbre, a landing thumps lower and dirtier the
-harder it lands, a throw whistles, and it breathes while it sleeps.
+harder it lands, a throw whistles, and it breathes while it sleeps. Every
+gesture brings its own cue, from the same handful of primitives: a boing that
+overshoots and wobbles down, a sneeze that inhales before it fires, applause
+built from irregular noise bursts because evenly spaced ones sound like a
+machine, and a purr that runs continuously at the twenty-four pulses a second a
+real one does. The speech bubble is voiced as it types, pitched by whatever it
+is feeling — so the same sentence sounds different when it is sulking.
 
 **Pick what it wears** under **Settings → Look → Wearing**, or from
 *right-click → Wearing*:
@@ -230,15 +296,29 @@ On the mascot:
 | Action | Result |
 | --- | --- |
 | Click | Poke it — it startles, bounces, and sometimes complains |
+| Keep clicking | It escalates: surprised, annoyed, exasperated, and finally furious enough to storm off |
 | Double-click | Gets it talking |
+| Middle-click | Ask it to do a trick — a different one nearly every time |
 | Drag | Pick it up; flick to throw it across the screen |
+| Pick it up and hold still | Hug it — it settles, purrs, and misses you when you put it down |
+| Shake it while holding | It complains, loudly, and goes dizzy |
+| Circle your cursor around it | Wind it up until it is dizzy |
+| Rest on it and keep still | A staring contest. It always blinks first, but not always at the same moment |
+| Hover just beside it | It notices someone is there and peeks at you |
 | Hover and wiggle | Tickle it |
 | Hover and stroke | Pet it — repeat and it grows fond of you |
 | Swipe fast at it | It dodges — approach slowly to catch it |
-| Right-click | Full menu: feelings, shape, colour, size, behaviour |
+| Poke it while it is asleep | It is not pleased about that |
+| Right-click | Full menu: do a trick, shape, colour, size, behaviour |
 | Drop a file on it | It holds onto it until you take it back |
 | Scroll | Resize |
 | Shift + scroll | Cycle body shape |
+
+None of these are announced anywhere but the settings window, and none of them
+need to be: winding a finger around something is already what "make it dizzy"
+looks like. Each is a pattern in the cursor feed rather than a click, and each
+has a test that checks both halves of the rule — that it fires when it should,
+and, the half that actually matters, that ordinary mouse use never trips it.
 
 Anywhere:
 
@@ -326,7 +406,9 @@ src/
     settings.html/css/js Settings window with a live preview
     lib/
       mark.js            Body + eye rendering
-      emotions.js        The 78-emotion table
+      emotions.js        The 131-emotion table
+      moves.js           73 scripted gestures, and the runner that plays them
+      gestures.js        Hugging, shaking, circling, loitering, staring
       behavior.js        Autonomy: meters and action selection
       attention.js       Where it wants to be, and what it noticed you doing
       focus.js           Active time per app, and the patterns worth mentioning
@@ -334,11 +416,14 @@ src/
       physics.js         Flight, drag, throw, gravity, bounce, multi-display
       particles.js       17 canvas effect emitters
       bubble.js          Speech bubbles
-      dialogue.js        What it says
+      dialogue.js        What it says, and the packs it says it in
+      dialogue-ar.js     Modern Standard Arabic
+      dialogue-eg.js     Egyptian Arabic, code-switched with English
       geom.js            Easing, noise, ring maths
   shared/
     mascot-data.js       18 shape paths + 25 expression eye-rings
-    themes.js            Coats and luminance-derived eye colour
+    themes.js            Coats, gradients, the glow, and eye colour that
+                         survives every stop of a gradient
 tools/
   make-icons.cjs         Renders app + tray icons from the shape paths
   make-sheet.cjs         Contact sheets of expressions / shapes / emotions
@@ -346,6 +431,7 @@ tools/
   test-displays.mjs      Multi-monitor + flight physics simulation
   test-attention.mjs     Attention rules: clearance, dodging, perching, riding
   test-companion.mjs     Grab feel, the work clock, timers, pomodoro, updates
+  test-gestures.mjs      The cursor gestures, and that no gesture ever snaps
   release.mjs            Preflight checks, then triggers the Release workflow
 ```
 
@@ -397,8 +483,30 @@ area, so the mascot is not confined to one screen:
 `npm test` simulates all of this headlessly across six monitor layouts —
 side-by-side, mixed-DPI with a vertical offset, second-monitor-on-the-left,
 stacked, three-monitor, and single — because these are the cases you cannot
-check without physically owning the hardware. The attention rules are simulated
-the same way.
+check without physically owning the hardware. The attention rules and the cursor
+gestures are simulated the same way, driven along synthetic cursor paths.
+
+### Testing something that has to *look* right
+
+Two of these checks are worth calling out, because animation is the part people
+usually give up on testing.
+
+Every gesture is played end to end and watched for a **discontinuity** — a frame
+where the body teleports rather than moves. The naive version of that check is a
+speed limit, but a barrel roll legitimately moves a long way every frame and a
+hiccup is supposed to be a jerk, so a speed limit only means no gesture is
+allowed to be quick. What separates a tear from fast-but-smooth motion is how it
+behaves when sampled more finely: smooth motion moves proportionally less per
+step as the step shrinks, and a step function jumps the same distance no matter
+how closely you look. So the gestures are run at 480Hz, where anything still
+moving several units in a single step is genuinely torn. That check found six
+real bugs on its first run — step functions where there should have been blends —
+and one gesture that finished mirrored.
+
+The first version of it passed for every possible input, because it compared the
+runner's output *after* the move had already been zeroed. A check that cannot
+fail is worse than no check, so this one now proves itself against a gesture
+built to be broken, every time it runs.
 
 ### How it feels in the hand
 

@@ -43,6 +43,30 @@
         <input type="color" id="customCoat" />
       </label>
 
+      <h2 data-i18n="look.gradient">Gradient</h2>
+      <div class="swatches" id="gradientGrid"></div>
+      <div class="row">
+        <span data-i18n="look.gradientColours">Its three colours</span>
+        <span class="stops" id="gradientStops">
+          <input type="color" data-stop="0" />
+          <input type="color" data-stop="1" />
+          <input type="color" data-stop="2" />
+        </span>
+      </div>
+      <label class="row row--slider">
+        <span data-i18n="look.gradientAngle">Angle</span>
+        <input type="range" id="gradientAngle" min="0" max="345" step="15" />
+        <output id="gradientAngleOut"></output>
+      </label>
+      <p class="note" id="gradientNote"></p>
+
+      <h2 data-i18n="look.glow">Glow</h2>
+      <label class="row row--slider">
+        <input type="range" id="glow" min="0" max="100" step="5" />
+        <output id="glowOut"></output>
+      </label>
+      <p class="note" data-i18n="look.glowNote">It shines in its own colour, breathing in time with the body. A gradient shines in two of them.</p>
+
       <h2 data-i18n="look.wearing">Wearing</h2>
       <div id="accessoryPicker"></div>
       <p class="note" id="accessoryNote"></p>
@@ -62,6 +86,10 @@
       <h2 data-i18n="look.language">Language</h2>
       <div class="actions" id="languagePicker"></div>
       <p class="note" data-i18n="look.languageNote">Changes the menus, this window, and what it says.</p>
+
+      <h2 data-i18n="look.voice">Voice</h2>
+      <div class="actions" id="voicePicker"></div>
+      <p class="note" data-i18n="look.voiceNote">How it talks, separately from the language of the menus.</p>
     </section>
 
     <!-- ---------------------------------------------------- BEHAVIOUR -->
@@ -172,8 +200,14 @@
         <dt data-i18n="keys.click">Click</dt><dd data-i18n="keys.clickDo">Poke it</dd>
         <dt data-i18n="keys.dblclick">Double-click</dt><dd data-i18n="keys.dblclickDo">Get it talking</dd>
         <dt data-i18n="keys.drag">Drag</dt><dd data-i18n="keys.dragDo">Pick it up</dd>
+        <dt data-i18n="keys.hold">Pick it up &amp; hold still</dt><dd data-i18n="keys.holdDo">Hug it</dd>
+        <dt data-i18n="keys.shake">Shake it while holding</dt><dd data-i18n="keys.shakeDo">It will complain</dd>
         <dt data-i18n="keys.wiggle">Hover &amp; wiggle</dt><dd data-i18n="keys.wiggleDo">Tickle it</dd>
         <dt data-i18n="keys.stroke">Hover &amp; stroke</dt><dd data-i18n="keys.strokeDo">Pet it</dd>
+        <dt data-i18n="keys.circle">Circle around it</dt><dd data-i18n="keys.circleDo">Make it dizzy</dd>
+        <dt data-i18n="keys.stare">Rest on it, both still</dt><dd data-i18n="keys.stareDo">Staring contest</dd>
+        <dt data-i18n="keys.linger">Hover just beside it</dt><dd data-i18n="keys.lingerDo">It peeks at you</dd>
+        <dt data-i18n="keys.middleclick">Middle-click</dt><dd data-i18n="keys.middleclickDo">Do a trick</dd>
         <dt data-i18n="keys.rightclick">Right-click</dt><dd data-i18n="keys.rightclickDo">Full menu</dd>
         <dt data-i18n="keys.scroll">Scroll</dt><dd data-i18n="keys.scrollDo">Resize</dd>
         <dt data-i18n="keys.shiftScroll">Shift + scroll</dt><dd data-i18n="keys.shiftScrollDo">Cycle body shape</dd>

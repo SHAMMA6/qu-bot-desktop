@@ -13,6 +13,11 @@
   <div id="stage">
     <div id="shadow"></div>
 
+    <!-- The colour glow. A sibling behind the body rather than a filter on it,
+         because a drop-shadow filter would re-rasterise the whole mark every
+         frame the eyes move, and this is a composited layer that never does. -->
+    <div id="glow"></div>
+
     <div id="bot">
       <div id="markHost"></div>
     </div>

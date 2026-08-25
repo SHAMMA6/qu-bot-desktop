@@ -13,10 +13,12 @@ import { Bubble } from './lib/bubble.js';
 import { Physics, MODE } from './lib/physics.js';
 import { Brain } from './lib/behavior.js';
 import { Attention, STANCE } from './lib/attention.js';
+import { Gestures } from './lib/gestures.js';
 import { Focus } from './lib/focus.js';
 import { Sound } from './lib/sound.js';
-import { say, LINES, setVoice, setLanguage } from './lib/dialogue.js';
-import { resolveCoat } from '../shared/themes.js';
+import { Choreo, MOVES, EMOTION_MOVES, moveFor } from './lib/moves.js';
+import { say, side, LINES, setVoice, setLanguage } from './lib/dialogue.js';
+import { resolveCoat, rgba } from '../shared/themes.js';
 import { clamp, rand, pick, chance, approach, ease, lerpExpression, makeNoise, TAU } from './lib/geom.js';
 
 const api = window.emoo;
@@ -25,6 +27,7 @@ const stage = document.getElementById('stage');
 const botEl = document.getElementById('bot');
 const markHost = document.getElementById('markHost');
 const shadowEl = document.getElementById('shadow');
+const glowEl = document.getElementById('glow');
 const fxCanvas = document.getElementById('fx');
 const bubbleEl = document.getElementById('bubble');
 const bubbleTextEl = document.getElementById('bubbleText');
@@ -76,7 +79,8 @@ const S = {
   star: 0,
 
   cursor: { x: 0, y: 0, has: false },
-  hovering: false,
+  hovering: false,       // over the body OR its bubble: the window must take clicks
+  onBody: false,         // over the body itself
   interactive: false,
   dragging: false,
   dragOffset: { x: 0, y: 0 },
@@ -85,10 +89,12 @@ const S = {
 
   petTime: 0,
   petCooldown: 0,
-  pokeStreak: 0,
   tickleReversals: 0,
   tickleWindow: 0,
   lastCursorDir: 0,
+
+  flinchAt: -99,
+  moveCooldown: 0,       // keeps spontaneous choreography from stacking up
 
   walkLeft: 0,
   idleSeconds: 0,
@@ -105,6 +111,7 @@ const S = {
   local: { x: 0, y: 0 },
   fxOrigin: { cx: FX_HALF, cy: FX_HALF, r: 64 },
 
+  glow: 0,               // colour glow strength, 0..1
   bondSaveIn: 30,        // seconds until the meters are written back
   humming: false,
   shelf: [],             // files the user has parked on it
@@ -119,10 +126,53 @@ const resolveAccessory = (choice) => {
   return choice;
 };
 
+// Which pack it speaks from. The interface language and the bot's voice are two
+// different choices: 'eg' — Egyptian Arabic mixed with English — is a way of
+// talking, not a locale, so it exists here and nowhere in the menus. 'auto'
+// means "whatever the interface is in", which is what most people want.
+let uiLang = 'en';
+function applyVoicePack() {
+  const choice = S.settings?.voice || 'auto';
+  setLanguage(choice === 'auto' ? uiLang : choice);
+}
+
 const brain = new Brain(handleIntent);
 const attention = new Attention();
+const gestures = new Gestures();
 const focus = new Focus();
 const sound = new Sound();
+const choreo = new Choreo();
+
+// A gesture brings its own sound and its own particles, so the move table stays
+// the one place a gesture is described and call sites only name it.
+choreo.onStart = (key, def) => {
+  if (def.sound) sound.cue(def.sound);
+  if (def.fx) fx.burst(def.fx, S.fxOrigin, def.fx === 'confetti' ? 22 : 8);
+};
+
+// ---------------------------------------------------------------- gestures
+// Where a move actually starts from, in desktop coordinates. Path moves are
+// authored as an offset from here, so a lap of the monitor is the same curve
+// wherever it is performed.
+const moveAnchor = { x: 0, y: 0 };
+
+// `play` is the single door into the choreography layer. It refuses when the
+// body is not free — mid-drag, mid-throw or asleep — so a gesture can never
+// fight the physics for control of the same pixels.
+function play(name, opts = {}) {
+  if (!name || !MOVES[name]) return false;
+  if (S.dragging || brain.asleep) return false;
+  if (!opts.force && (S.moveCooldown > 0 || choreo.active)) return false;
+  moveAnchor.x = physics.x;
+  moveAnchor.y = physics.y;
+  S.moveCooldown = opts.cooldown ?? 0.6;
+  return choreo.play(name, opts);
+}
+
+// "Do something that reads as happy" — the brain and the reactions ask for a
+// mood, not for a named gesture, so adding a move to moves.js puts it into
+// rotation everywhere at once.
+const playTagged = (tag, opts) => play(moveFor(tag), opts);
 
 // ---------------------------------------------------------------- emotions
 function setEmotion(key, opts = {}) {
@@ -141,6 +191,12 @@ function setEmotion(key, opts = {}) {
     S.morphSpeed = def.settle;
     fx.clearAccumulator();
     api?.emotionChanged?.(key);
+    // Getting angry should DO something, not merely look like something. Not
+    // every time, or the gestures stop being events — most feelings pass
+    // quietly, and the ones that do not are the ones you remember. `play`
+    // refuses on its own when gestures are switched off.
+    const pool = opts.move === false ? null : EMOTION_MOVES[key];
+    if (pool && chance(0.42)) play(pick(pool));
   }
   if (def.blink && S.nextBlink > def.blink[1]) S.nextBlink = rand(def.blink[0], def.blink[1]);
 }
@@ -172,10 +228,25 @@ function handleIntent(intent) {
       S.spinVel += (chance(0.5) ? 1 : -1) * rand(22, 30);
       setEmotion(pick(['excited', 'happy', 'laughing']));
       break;
+    case 'move':
+      play(intent.key, { force: intent.force });
+      break;
+    case 'moveTag':
+      playTagged(intent.tag);
+      break;
   }
 }
 
 const speak = (text, opts) => { if (text) bubble.say(text, opts); };
+
+// A side word: one or two syllables, on screen briefly. Deliberately a separate
+// door from `speak` — these fire on beats far too small to justify a sentence,
+// and they are gated on chatter the same way everything else it says is.
+function blurt(kind, p = 0.7) {
+  if (!S.settings?.chatter || S.settings.focusMode) return;
+  if (bubble.state === 'typing' || !chance(p)) return;
+  bubble.say(side(kind), { hold: 1.1, speed: 90 });
+}
 
 // Hop across to an adjacent monitor. Deliberately fast: at strolling pace the
 // body would sit clipped by the screen edge for over a second, whereas at this
@@ -200,34 +271,146 @@ function react(kind) {
 
   switch (kind) {
     case 'poke': {
-      S.pokeStreak += 1;
-      clearTimeout(S._pokeReset);
-      S._pokeReset = setTimeout(() => { S.pokeStreak = 0; }, 3200);
-      const annoyed = brain.mood < 0.3 || S.pokeStreak > 4;
-      setEmotion(annoyed ? 'annoyed' : pick(['surprised', 'happy', 'curious', 'wink']));
+      // Poking escalates. The first is a surprise, the fourth is an intrusion,
+      // and past that it is a bit. Each rung has its own face, gesture and line,
+      // which is what makes leaning on the mouse button worth doing at all. The
+      // ladder itself lives in gestures.js, with the rest of the thresholds.
+      if (brain.asleep) { gestures.poke(brain.mood); reactWakePoke(); break; }
+      const rung = gestures.poke(brain.mood);
+      if (rung === 3) {
+        setEmotion('furious');
+        play('fume', { force: true });
+        // Queued rather than forced, or storming off would cut the fuming short
+        // and the whole point is that you see it lose its temper first. Storming
+        // off is also the only reaction that costs the user anything: they now
+        // have to go and find it again.
+        if (!S.settings.gravity) choreo.play('retreat', { queue: true });
+        if (S.settings.chatter) speak(say('clickStorm'));
+        brain.displeased(0.14);
+        sound.grumble();
+      } else if (rung === 2) {
+        setEmotion('exasperated');
+        play('huff', { force: true });
+        if (S.settings.chatter) speak(say('clickStorm'));
+        brain.displeased(0.09);
+      } else if (rung === 1) {
+        setEmotion('annoyed');
+        playTagged('annoyed');
+        if (S.settings.chatter && chance(0.6)) speak(say('ignored'));
+        brain.displeased(0.06);
+      } else {
+        setEmotion(pick(['surprised', 'happy', 'curious', 'wink', 'giggling', 'delighted']));
+        playTagged(chance(0.5) ? 'startle' : 'happy');
+        if (S.settings.chatter) {
+          chance(0.45) ? speak(say('poke')) : blurt(pick(['ow', 'hey', 'huh']), 0.8);
+        }
+        brain.pleased(0.05);
+      }
       physics.nudge(rand(-70, 70), -190);
       impact(0.22);
       sound.poke();
-      if (S.settings.chatter && chance(0.55)) speak(say(annoyed ? 'ignored' : 'poke'));
-      annoyed ? brain.displeased(0.06) : brain.pleased(0.05);
       break;
     }
     case 'pet':
-      setEmotion(brain.affection > 0.6 ? 'love' : 'content');
+      setEmotion(brain.affection > 0.6 ? 'adoring' : pick(['content', 'cozy', 'beaming']));
       brain.pleased(0.09);
       if (chance(0.35)) fx.burst('heart', S.fxOrigin, 2);
-      if (S.settings.chatter && chance(0.25)) speak(say('pet'));
+      if (chance(0.4)) play('nuzzle');
+      if (S.settings.chatter) chance(0.3) ? speak(say('pet')) : blurt('aww', 0.5);
       sound.emote('happy');
       break;
     case 'tickle':
-      setEmotion('laughing');
+      setEmotion(chance(0.5) ? 'laughing' : 'giggling');
+      play('jelly', { force: true });
       brain.pleased(0.14);
-      if (S.settings.chatter && chance(0.6)) speak(say('tickle'));
+      if (S.settings.chatter) chance(0.6) ? speak(say('tickle')) : blurt('heh', 0.8);
       sound.emote('laughing');
       break;
     case 'talk':
-      setEmotion(pick(['talking', 'happy', 'curious', 'thinking']));
+      setEmotion(pick(['talking', 'happy', 'curious', 'thinking', 'pondering', 'teasing']));
+      playTagged('talk');
       speak(say(pick(['idleMusing', 'compliment', 'hungry', 'poke'])));
+      break;
+  }
+}
+
+// ---- the newer gestures --------------------------------------------------
+// Each of these is a pattern in the cursor feed rather than a click: holding
+// still on the body, circling it, shaking it, staring at it. They cost nothing
+// to perform and nobody has to be told they exist, which is the point.
+
+function reactWakePoke() {
+  brain.wake(false);
+  setEmotion('grumpy');
+  play('jolt', { force: true });
+  brain.displeased(0.08);
+  if (S.settings.chatter) speak(say('wakePoke'));
+  sound.hmph();
+}
+
+function reactHug() {
+  brain.count('pets', 1.2);
+  brain.pleased(0.16);
+  setEmotion(brain.affection > 0.5 ? 'adoring' : 'cozy', { hold: 5 });
+  play('heartbeat', { force: true });
+  fx.burst('heart', S.fxOrigin, 5);
+  sound.startPurr();
+  if (S.settings.chatter) speak(say('hug'));
+}
+
+function reactShaken() {
+  sound.stopPurr();
+  brain.interacted();
+  brain.displeased(0.05);
+  setEmotion('dizzy', { hold: 4.5 });
+  if (S.settings.chatter) chance(0.7) ? speak(say('shaken')) : blurt('ugh', 0.9);
+  sound.wobble();
+}
+
+function reactOrbited() {
+  brain.interacted();
+  setEmotion('dizzy', { hold: 4 });
+  play('hypnotised', { force: true });
+  if (S.settings.chatter) speak(say('spun'));
+}
+
+function reactHoverNear() {
+  if (!canReact(8)) return;
+  setEmotion(pick(['peek', 'curious', 'eavesdropping', 'spying']));
+  play(chance(0.5) ? 'peer' : 'lean');
+  if (S.settings.chatter && chance(0.4)) speak(say('hoverNear'));
+}
+
+function reactFlinch() {
+  if (S.clock - S.flinchAt < 6) return;
+  S.flinchAt = S.clock;
+  setEmotion(pick(['spooked', 'scared', 'surprised']));
+  play(pick(['flinch', 'recoil', 'jumpScare']), { force: true });
+  impact(0.2);
+  if (S.settings.chatter) chance(0.5) ? speak(say('flinchNear')) : blurt('hey', 0.9);
+}
+
+// Everything gestures.js noticed this frame. Same shape as onAttentionEvent:
+// the detector decides that something happened, this decides what it means.
+function onGestureEvent(ev) {
+  switch (ev.type) {
+    case 'hug': reactHug(); break;
+    case 'shaken': reactShaken(); break;
+    case 'orbited': reactOrbited(); break;
+    case 'hoverNear': reactHoverNear(); break;
+    case 'stare':
+      setEmotion('inspecting', { sticky: true, hold: 0 });
+      if (S.settings.chatter && chance(0.6)) speak(say('stare'));
+      break;
+    case 'stareLost':
+      // It blinks first. Always. The only thing that varies is how long it
+      // manages to hold out first.
+      S.sticky = false;
+      setEmotion('giggling', { hold: 3 });
+      play('wiggle', { force: true });
+      brain.pleased(0.08);
+      if (S.settings.chatter) speak(say('stareLost'));
+      sound.emote('laughing');
       break;
   }
 }
@@ -330,15 +513,20 @@ function onAttentionEvent(ev) {
       break;
     case 'stirred':
       if (!canReact(6)) return;
-      if (!S.sticky) setEmotion(pick(['curious', 'listening', 'neutral']));
+      if (!S.sticky) setEmotion(pick(['curious', 'listening', 'neutral', 'pondering', 'waiting']));
       break;
     case 'flick':
       if (!canReact(9)) return;
-      setEmotion('surprised');
+      setEmotion(pick(['surprised', 'alert', 'spooked']));
+      play('doubleTake');
       break;
     case 'dodged':
       if (!canReact(4)) return;
-      setEmotion(pick(['surprised', 'scared']));
+      // A cursor coming straight at it at speed is the one moment it is
+      // allowed to be genuinely startled rather than merely surprised.
+      if (attention.speed > 2600) { reactFlinch(); break; }
+      setEmotion(pick(['surprised', 'scared', 'spooked']));
+      play('dodgeStep');
       impact(0.18);
       if (S.settings.chatter && chance(0.35)) speak(say('dodge'));
       break;
@@ -449,6 +637,14 @@ function updateInteractivity() {
 
 // ---------------------------------------------------------------- input
 botEl.addEventListener('pointerdown', (e) => {
+  // Middle click asks it to show off: a random gesture from the whole roster,
+  // on demand. The one place in the app where you get to pick nothing and it
+  // picks something.
+  if (e.button === 1) {
+    e.preventDefault();
+    COMMANDS.trick();
+    return;
+  }
   if (e.button !== 0) return;
   e.preventDefault();
   try { botEl.setPointerCapture(e.pointerId); } catch { /* not fatal */ }
@@ -459,6 +655,9 @@ botEl.addEventListener('pointerdown', (e) => {
   S.dragOffset.x = physics.x - S.cursor.x;
   S.dragOffset.y = physics.y - S.cursor.y;
   physics.grab(physics.x, physics.y);
+  gestures.grabbed();
+  // A gesture and a hand cannot both own the body. The hand wins.
+  choreo.stop();
   brain.suppressed = true;
   brain.interacted();
   setEmotion('held', { sticky: true });
@@ -472,6 +671,11 @@ function endDrag(e) {
   botEl.classList.remove('is-held');
   try { botEl.releasePointerCapture(e.pointerId); } catch { /* pointer already released */ }
   brain.suppressed = false;
+  if (gestures.released()) {
+    sound.stopPurr();
+    // Being put down after a hug is a small loss, and it is worth showing.
+    if (chance(0.5)) { setEmotion(pick(['content', 'grateful', 'wistful']), { hold: 3 }); play('nodSlow'); }
+  }
 
   const speed = physics.release();
   const heldFor = (performance.now() - S.dragStart) / 1000;
@@ -579,9 +783,16 @@ function onCursor(pt) {
     if (brain.asleep || S.emotion === 'sleepy') brain.wake();
     else if (chance(0.3) && !S.sticky) setEmotion('curious');
   }
+  // `hovering` covers the bubble too, because both must make the window
+  // clickable. `onBody` is the stricter one — the cursor genuinely on the
+  // character — which is what the staring contest means by eye contact.
+  S.onBody = on;
   S.hovering = on || overBubble(lx, ly);
   updateInteractivity();
 
+  // Everything that is a *pattern* in the cursor feed rather than a click —
+  // hugging, shaking, circling, loitering, staring — is read in gestures.js and
+  // arrives as an event from the frame loop.
   if (S.dragging) {
     S.dragMoved += Math.hypot(pt.x - prevX, pt.y - prevY);
     physics.dragTo(pt.x + S.dragOffset.x, pt.y + S.dragOffset.y, S.clock);
@@ -621,12 +832,19 @@ function applySettings(next) {
   const prev = S.settings;
   S.settings = next;
 
-  const { coat, ink } = resolveCoat(next.coat, next.customCoat);
+  const { coat, ink, gradient } = resolveCoat(next.coat, next.customCoat, next.gradient);
   const root = document.documentElement.style;
   root.setProperty('--coat', coat);
   root.setProperty('--ink', ink);
   root.setProperty('--size', `${next.size}px`);
-  mark.setColors({ coat, ink });
+  // The glow takes its colour from the coat, so it is always the bot shining
+  // rather than a light source that happens to be behind it. A gradient shines
+  // in two of its own colours, which is the whole reason it is worth having.
+  const g = gradient ? gradient.colors : [coat, coat];
+  root.setProperty('--glow-core', rgba(g[g.length - 1], 0.6));
+  root.setProperty('--glow-mid', rgba(g[0], 0.26));
+  S.glow = clamp(next.glow ?? 0, 0, 1);
+  mark.setColors({ coat, ink, gradient });
   mark.setShape(next.shape);
   fx.setColors({ coat, ink });
   stage.style.opacity = String(next.opacity ?? 1);
@@ -645,6 +863,11 @@ function applySettings(next) {
   attention.homeWhenBusy = !!next.homeWhenBusy;
   attention.focusMode = !!next.focusMode;
   document.body.classList.toggle('is-flying', !next.gravity);
+
+  choreo.enabled = next.gestures !== false;
+  if (!choreo.enabled) choreo.stop();
+
+  applyVoicePack();
 
   brain.enabled.roam = !!next.roam;
   brain.enabled.chatter = !!next.chatter;
@@ -808,8 +1031,17 @@ function frame(now) {
   const mayMove = S.settings.followCursor || S.settings.roam
     || (S.settings.rideWindows && S.settings.watchActivity)
     || (S.settings.home && (S.settings.homeWhenBusy || S.settings.focusMode));
-  if (mayMove && !S.dragging && !brain.asleep
-      && physics.mode === MODE.FLOATING && !physics.gravityEnabled) {
+  const flightFree = !S.dragging && !brain.asleep
+    && physics.mode === MODE.FLOATING && !physics.gravityEnabled;
+  // A travelling gesture owns the flight target for as long as it runs — a lap
+  // of the monitor is not a suggestion the attention system gets a vote on.
+  // Tightened tracking too, or the steering lag turns every figure-eight into a
+  // vague oval.
+  if (choreo.path && flightFree) {
+    const size = S.settings.size;
+    physics.trackTight = 1;
+    physics.hoverTo(moveAnchor.x + choreo.path.x * size, moveAnchor.y + choreo.path.y * size);
+  } else if (mayMove && flightFree) {
     physics.hoverTo(attention.target.x, attention.target.y);
   }
 
@@ -866,6 +1098,19 @@ function frame(now) {
 
   if (S.petCooldown > 0) S.petCooldown -= dt;
   if (S.tickleWindow > 0) { S.tickleWindow -= dt; if (S.tickleWindow <= 0) S.tickleReversals = 0; }
+  if (S.moveCooldown > 0) S.moveCooldown -= dt;
+
+  // The gestures that are patterns in the cursor feed rather than clicks.
+  for (const ev of gestures.update(dt, {
+    cursor: S.cursor,
+    body: { x: physics.x, y: physics.y },
+    radius: S.settings.size * 0.5,
+    dragging: S.dragging,
+    onBody: S.onBody && !S.dragging,
+    asleep: brain.asleep,
+    speed: attention.speed,
+    quiet: !!S.settings.focusMode,
+  })) onGestureEvent(ev);
 
   // ---- body transform
   const t = S.clock;
@@ -890,12 +1135,21 @@ function frame(now) {
   const sx = def.scale * (1 - breathe + sq * 0.85 + stretch.amount * Math.abs(Math.cos(stretch.angle)));
   const sy = def.scale * (1 + breathe - sq + stretch.amount * Math.abs(Math.sin(stretch.angle)));
 
+  // ---- choreography, layered on top of the emotion's own pose
+  const g = choreo.update(dt);
+
   mark.update({
     rings: S.rings,
-    gaze: S.gaze,
-    lid: S.lid,
+    gaze: { x: S.gaze.x + (g.gazeX ?? 0), y: S.gaze.y + (g.gazeY ?? 0) },
+    lid: clamp(S.lid + g.lid * (1 - S.lid), 0, 0.97),
     eyeScale: def.eye,
-    body: { x: jx, y: bob + def.yOffset + jy + noseDown, rot: sway + def.lean + travelTilt + S.spin, sx, sy },
+    body: {
+      x: jx + g.x,
+      y: bob + def.yOffset + jy + noseDown + g.y,
+      rot: sway + def.lean + travelTilt + S.spin + g.rot,
+      sx: sx * g.sx,
+      sy: sy * g.sy,
+    },
     blush: (S.blush = approach(S.blush, def.blush, 6, dt)),
     star: (S.star = approach(S.star, def.star, 5, dt)),
   });
@@ -917,6 +1171,19 @@ function frame(now) {
     `translate3d(${lx.toFixed(1)}px, ${(ly + drop).toFixed(1)}px, 0) ` +
     `scale(${((size / 100) * (1 - air * 0.42)).toFixed(3)})`;
   shadowEl.style.opacity = ((1 - air * 0.62) * 0.9).toFixed(3);
+
+  // The glow breathes on the same wave the body does, so it reads as the bot
+  // shining rather than as a lamp pointed at it — and it swells when it is
+  // excited, because `breathe.amp` is already the measure of how worked up it
+  // is. Skipped entirely at zero, which is the default, so nobody pays for it.
+  if (S.glow > 0.001) {
+    const pulse = 0.72 + 0.28 * Math.sin(t * def.breathe.rate * TAU);
+    glowEl.style.transform =
+      `translate3d(${lx.toFixed(1)}px, ${ly.toFixed(1)}px, 0) scale(${(1 + breathe * 2).toFixed(3)})`;
+    glowEl.style.opacity = (S.glow * pulse).toFixed(3);
+  } else if (glowEl.style.opacity !== '0') {
+    glowEl.style.opacity = '0';
+  }
 
   // ---- particles (canvas rides along with the body)
   fxCanvas.style.transform = `translate3d(${(lx - FX_HALF).toFixed(1)}px, ${(ly - FX_HALF).toFixed(1)}px, 0)`;
@@ -992,6 +1259,16 @@ const COMMANDS = {
     speak(p.text || say(pick(['idleMusing', 'compliment', 'hungry', 'bored'])));
   },
   hop: () => { physics.hop(1); setEmotion('happy'); },
+
+  // Asked to show off, from either menu or from a middle click. Picks from the
+  // whole gesture roster rather than repeating one party piece.
+  trick: () => {
+    brain.interacted();
+    brain.pleased(0.05);
+    if (!playTagged(pick(['show', 'play', 'dance', 'travel']), { force: true })) return;
+    setEmotion(pick(['playful', 'proud', 'mischievous', 'delighted', 'giddy']));
+    if (S.settings.chatter && chance(0.6)) speak(say('trick'));
+  },
   celebrate: () => {
     setEmotion('celebrating');
     fx.burst('confetti', S.fxOrigin, 42);
@@ -1091,8 +1368,9 @@ const COMMANDS = {
 
 // ---------------------------------------------------------------- boot
 api.onSettings(applySettings);
-// Which pack it speaks from. Resolved by main, because 'auto' means the OS locale.
-api.onLanguage?.((l) => setLanguage(l));
+// The interface language, resolved by main because 'auto' means the OS locale.
+// It only decides the voice when the voice setting is itself on 'auto'.
+api.onLanguage?.((l) => { uiLang = l || 'en'; applyVoicePack(); });
 api.onLayout(layout);
 api.onCursor(onCursor);
 api.onDisplays((list) => { physics.setDisplays(list); S.hostId = null; });
@@ -1110,13 +1388,16 @@ api.onMachine?.((info) => onMachine(info));
 watchPixelRatio();
 watchMachine();
 
-bubble.onType = () => { if (chance(0.28)) sound.type(); };
+// The bubble types itself out; this gives it a voice while it does. Pitched by
+// whatever it is feeling, so the same sentence sounds different when it is
+// sulking — which is the whole reason it is not just a keyboard click.
+bubble.onType = () => { if (chance(0.4)) sound.voice(S.emotion); };
 
 // Debug hook: lets a dev capture pose the character deterministically. Exposes
 // only this page's own state — nothing privileged crosses the preload boundary.
 window.__emoo = {
-  state: S, physics, brain, attention, focus, sound, fx, bubble, mark,
-  setEmotion, speak, commands: COMMANDS,
+  state: S, physics, brain, attention, gestures, focus, sound, fx, bubble, mark, choreo,
+  setEmotion, speak, play, playTagged, commands: COMMANDS,
   pose({ x, y, emotion, shape, text, burst, count, coat, ink }) {
     // Freeze the autonomous parts so a capture is deterministic.
     brain.suppressed = true;
@@ -1138,7 +1419,7 @@ api.ready().then((boot) => {
   layout(boot.window);
   // Seed the meters BEFORE settings, so personality is applied to a brain that
   // already remembers how it feels about you.
-  setLanguage(boot.lang);
+  uiLang = boot.lang || 'en';
   brain.loadBond(boot.bond);
   S.shelf = Array.isArray(boot.shelf) ? boot.shelf : [];
   applySettings(boot.settings);
